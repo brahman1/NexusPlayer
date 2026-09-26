@@ -12,7 +12,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.nexusplayer.app"
+      "bundleIdentifier": "com.brahman1.nexusplayer"
     },
     "android": {
       "package": "com.nexusplayer.app",
