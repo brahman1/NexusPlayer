@@ -1,0 +1,57 @@
+{
+  "expo": {
+    "name": "NexusPlayer",
+    "slug": "nexusplayer",
+    "scheme": "nexusplayer",
+    "version": "1.0.0",
+    "orientation": "default",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "experiments": {
+      "typedRoutes": true
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.nexusplayer.app"
+    },
+    "android": {
+      "package": "com.nexusplayer.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "plugins": [
+      [
+        "@react-native-tvos/config-tv",
+        {
+          "androidTVRequired": false,
+          "removeFlipperOnAndroid": true,
+          "tvosDeploymentTarget": "15.1"
+        }
+      ],
+      [
+        "expo-video",
+        {
+          "supportsBackgroundPlayback": true,
+          "supportsPictureInPicture": true
+        }
+      ],
+      [
+        "expo-secure-store",
+        {
+          "configureAndroidBackup": true,
+          "faceIDPermission": "Autoriser NexusPlayer à protéger vos identifiants."
+        }
+      ],
+      "expo-font",
+      "expo-router"
+    ],
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}
