@@ -5,9 +5,11 @@ import {
   Alert,
   FlatList,
   Modal,
+  Platform,
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 
@@ -35,6 +37,8 @@ function ActionButton({ label, onPress, disabled = false }: { label: string; onP
 
 export function LibraryScreen() {
   const router = useRouter();
+  const { width } = useWindowDimensions();
+  const compact = !Platform.isTV && width < 600;
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -136,7 +140,7 @@ export function LibraryScreen() {
 
   return (
     <Screen navigation>
-      <View style={styles.container}>
+      <View style={[styles.container, compact && styles.containerCompact]}>
         <PageHeader eyebrow="SOURCES" title="Vos sources" subtitle={`${playlists.length} source${playlists.length > 1 ? 's' : ''} configurée${playlists.length > 1 ? 's' : ''}`} action={<PrimaryButton label="Ajouter" onPress={() => router.push('/add-playlist')} />} />
 
         {notice && <StatusBanner kind="success" title={notice} />}
@@ -214,6 +218,7 @@ export function LibraryScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: spacing.xl },
+  containerCompact: { padding: 20 },
   header: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   title: { color: colors.text, fontSize: 36, fontWeight: '900' },
   subtitle: { color: colors.textMuted, fontSize: 16, marginTop: spacing.xs },
@@ -233,7 +238,7 @@ const styles = StyleSheet.create({
   emptyTitle: { color: colors.text, fontSize: 25, fontWeight: '800' },
   emptyText: { color: colors.textMuted, fontSize: 17, marginTop: spacing.sm },
   error: { color: colors.danger, fontSize: 15, marginTop: spacing.md },
-  modalBackdrop: { alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.72)', flex: 1, justifyContent: 'center', padding: spacing.xl },
+  modalBackdrop: { alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.72)', flex: 1, justifyContent: 'center', padding: 20 },
   modalCard: { backgroundColor: colors.surfaceRaised, borderColor: colors.border, borderRadius: radii.lg, borderWidth: 1, gap: spacing.md, maxWidth: 680, padding: spacing.xl, width: '100%' },
   modalTitle: { color: colors.text, fontSize: 25, fontWeight: '800' },
   input: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radii.md, borderWidth: 1, color: colors.text, fontSize: 17, minHeight: 56, paddingHorizontal: spacing.md },

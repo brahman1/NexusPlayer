@@ -13,6 +13,12 @@ export const colors = {
   focus: '#FFFFFF',
 } as const;
 
+export const gradients = {
+  screen: ['#070A0F', '#0A1020', '#171137', '#070A0F'] as const,
+  hero: ['rgba(108,124,255,0.32)', 'rgba(91,63,181,0.24)', 'rgba(16,22,33,0.96)'] as const,
+  accent: ['#8D99FF', '#6C7CFF', '#745FE7'] as const,
+} as const;
+
 export const spacing = {
   xs: 4,
   sm: 8,

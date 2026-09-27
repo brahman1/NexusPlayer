@@ -1,6 +1,6 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { FlatList, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { FocusableCard } from '../components/FocusableCard';
 import { ActionButton, EmptyState, FilterChip, LoadingSkeleton, PageHeader, Panel } from '../components/NexusUI';
@@ -19,6 +19,8 @@ type ChannelSchedule = { channelId: string; channelName: string; programmes: Gui
 
 export function GuideScreen() {
   const router = useRouter();
+  const { width } = useWindowDimensions();
+  const compact = !Platform.isTV && width < 600;
   const [items, setItems] = useState<GuideProgramme[]>([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<GuideView>('now');
@@ -66,7 +68,7 @@ export function GuideScreen() {
     setView('grid');
   }, []);
 
-  return <Screen navigation><View style={styles.container}>
+  return <Screen navigation><View style={[styles.container, compact && styles.containerCompact]}>
     <PageHeader eyebrow="PROGRAMMES" title="Guide TV" subtitle={`${formatDay(windowStart)} · ${formatTime(windowStart)}–${formatTime(windowEnd)}`} />
     <View style={styles.toolbar}>
       <View style={styles.filters}>
@@ -137,13 +139,14 @@ function formatDay(date: Date) { return date.toLocaleDateString('fr-FR', { weekd
 
 const styles = StyleSheet.create({
   container: { flex: 1, gap: spacing.md, padding: spacing.xl },
+  containerCompact: { padding: 12 },
   toolbar: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, justifyContent: 'space-between' },
   filters: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }, navigation: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   list: { gap: spacing.sm, paddingBottom: spacing.xl },
-  nowRow: { alignItems: 'center', flexDirection: 'row', gap: spacing.lg, minHeight: 86 }, nowTime: { width: 190 }, timeText: { color: colors.text, fontSize: 16, fontWeight: '800' }, channel: { color: colors.textMuted, fontSize: 13, marginTop: spacing.xs },
+  nowRow: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: spacing.lg, minHeight: 86 }, nowTime: { minWidth: 130, width: '24%' }, timeText: { color: colors.text, fontSize: 16, fontWeight: '800' }, channel: { color: colors.textMuted, fontSize: 13, marginTop: spacing.xs },
   nowProgramme: { flex: 1 }, programmeTitle: { color: colors.text, fontSize: 18, fontWeight: '800' }, track: { backgroundColor: colors.border, borderRadius: radii.pill, height: 5, marginTop: spacing.sm, overflow: 'hidden' }, progress: { backgroundColor: colors.accentStrong, height: '100%' }, live: { color: colors.danger, fontSize: 12, fontWeight: '900' },
   gridViewport: { flex: 1, minHeight: 300 }, timelineHeader: { backgroundColor: colors.surface, flexDirection: 'row', height: 52 }, timelineCorner: { borderColor: colors.border, borderRightWidth: 1, justifyContent: 'center', paddingHorizontal: spacing.md, width: CHANNEL_WIDTH }, timelineCornerText: { color: colors.textMuted, fontSize: 12, fontWeight: '900' }, timeline: { flexDirection: 'row', position: 'relative', width: TIMELINE_WIDTH }, slot: { borderLeftColor: colors.border, borderLeftWidth: 1, justifyContent: 'center', paddingLeft: spacing.sm, width: EPG_SLOT_MINUTES * EPG_PIXELS_PER_MINUTE }, slotText: { color: colors.textMuted, fontSize: 13, fontWeight: '800' },
   gridRow: { borderBottomColor: colors.border, borderBottomWidth: 1, flexDirection: 'row', height: 82 }, channelCell: { backgroundColor: colors.surface, borderRightColor: colors.border, borderRightWidth: 1, justifyContent: 'center', paddingHorizontal: spacing.md, width: CHANNEL_WIDTH }, gridChannel: { color: colors.text, fontSize: 15, fontWeight: '800' }, programmeLane: { backgroundColor: colors.background, position: 'relative', width: TIMELINE_WIDTH }, gridProgramme: { bottom: 6, justifyContent: 'center', paddingHorizontal: spacing.sm, position: 'absolute', top: 6 }, gridProgrammeLive: { backgroundColor: '#2B234F', borderColor: colors.accentStrong }, gridProgrammeTitle: { color: colors.text, fontSize: 14, fontWeight: '800' }, gridProgrammeTime: { color: colors.textMuted, fontSize: 11, marginTop: 2 }, nowLine: { backgroundColor: colors.danger, bottom: 0, position: 'absolute', top: 0, width: 2 }, nowHeaderLine: { backgroundColor: colors.danger, bottom: 0, position: 'absolute', top: 0, width: 2 },
-  slotNavigation: { flexDirection: 'row', gap: spacing.sm, justifyContent: 'center' },
+  slotNavigation: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, justifyContent: 'center' },
   detailPanel: { alignSelf: 'center', gap: spacing.md, maxWidth: 900, width: '100%' }, detailEyebrow: { color: colors.accentStrong, fontSize: 13, fontWeight: '900', letterSpacing: 1.5 }, detailTitle: { color: colors.text, fontSize: 30, fontWeight: '900' }, detailSchedule: { color: colors.textMuted, fontSize: 16, fontWeight: '700' }, detailDescription: { color: colors.text, fontSize: 17, lineHeight: 26 }, detailActions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md },
 });

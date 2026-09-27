@@ -228,6 +228,20 @@ propriétaire ; commencer par reconstruire l'application iPhone, puis valider ce
 lecteur avant l'envoi TestFlight. Continuer ensuite sur Android TV physique et
 Apple TV.
 
+### Finition Obsidian et audit adaptatif — 27 septembre 2026
+
+- Ajouté : fond dégradé Obsidian partagé sur tous les écrans, hero Accueil plus
+  profond et actions principales avec dégradé violet/indigo cohérent.
+- Corrigé : zones sûres de la barre mobile, marges compactes, boutons longs,
+  retours à la ligne, panneaux VOD, liste d'épisodes, Guide, Recherche et Sources.
+- Corrigé : largeur des cartes Films/Séries sur TV en tenant compte de la barre
+  latérale, ainsi que la largeur des cartes Live sur petits téléphones et TV.
+- Validé automatiquement : TypeScript, ESLint, 21 suites / 66 tests, bundles
+  Android mobile, iOS mobile, Android TV et tvOS.
+- À confirmer pendant la validation physique : rendu avec taille de texte iOS et
+  Android agrandie, zones de surbalayage TV, focus aux quatre bords et orientations
+  portrait/paysage sur les appareils réels ciblés.
+
 1. **Fiabiliser le lecteur Live**
    - enregistrer la chaîne en cours et relancer automatiquement la lecture après
      une interruption réseau récupérable ;

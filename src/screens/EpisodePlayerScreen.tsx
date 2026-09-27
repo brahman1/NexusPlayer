@@ -1,6 +1,6 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { ActionButton, Panel } from '../components/NexusUI';
 import { Screen } from '../components/Screen';
 import { TrackedVideoPlayer } from '../components/TrackedVideoPlayer';
@@ -17,6 +17,8 @@ type EpisodeMedia = { headerTitle: string; id: string; name: string; next: { id:
 export function EpisodePlayerScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { width } = useWindowDimensions();
+  const compact = !Platform.isTV && width < 600;
   const [media, setMedia] = useState<EpisodeMedia | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
@@ -55,15 +57,16 @@ export function EpisodePlayerScreen() {
   return <Screen fullscreen={fullscreen}><View style={styles.screen}>
     <Stack.Screen options={{ headerShown: !fullscreen, title: media?.headerTitle ?? 'Épisode' }} />
     {media?.id === id ? <TrackedVideoPlayer key={media.id} mediaId={media.id} mediaKind="episode" name={media.name} onEnded={onEnded} onFullscreenChange={setFullscreen} resumeSeconds={media.resumeSeconds} uri={media.uri} /> : error ? <Text style={styles.error}>{error}</Text> : <ActivityIndicator color={colors.accentStrong} size="large" />}
-    {finished && media?.id === id && <Panel style={styles.nextPanel}>{media.next ? <><Text style={styles.nextTitle}>Épisode suivant dans {countdown ?? 0} s</Text><Text style={styles.nextName}>{media.next.name}</Text><View style={styles.actions}><ActionButton autoFocus icon="play" label="Lire maintenant" onPress={playNext} /><ActionButton icon="close" label="Annuler" onPress={() => { setCountdown(null); setFinished(false); }} variant="secondary" /></View></> : <Text style={styles.nextTitle}>Série terminée</Text>}</Panel>}
+    {finished && media?.id === id && <Panel style={[styles.nextPanel, compact && styles.nextPanelCompact]}>{media.next ? <><Text style={styles.nextTitle}>Épisode suivant dans {countdown ?? 0} s</Text><Text numberOfLines={2} style={styles.nextName}>{media.next.name}</Text><View style={styles.actions}><ActionButton autoFocus icon="play" label="Lire maintenant" onPress={playNext} /><ActionButton icon="close" label="Annuler" onPress={() => { setCountdown(null); setFinished(false); }} variant="secondary" /></View></> : <Text style={styles.nextTitle}>Série terminée</Text>}</Panel>}
   </View></Screen>;
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   nextPanel: { alignSelf: 'center', bottom: spacing.xl, maxWidth: 680, position: 'absolute', width: '80%' },
+  nextPanelCompact: { bottom: spacing.sm, padding: spacing.md, width: '94%' },
   nextTitle: { color: colors.text, fontSize: 22, fontWeight: '900' },
   nextName: { color: colors.textMuted, fontSize: 16, marginTop: spacing.xs },
-  actions: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.md },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginTop: spacing.md },
   error: { color: colors.danger, fontSize: 17, padding: spacing.xl, textAlign: 'center' },
 });

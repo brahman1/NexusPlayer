@@ -1,4 +1,5 @@
 import { useFocusEffect, useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useCallback, useState } from 'react';
 import { Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { ChannelTile, MediaPoster } from '../components/MediaCards';
@@ -7,7 +8,7 @@ import { Screen } from '../components/Screen';
 import { DiscoveryRepository } from '../repositories/DiscoveryRepository';
 import { SQLitePlaylistRepository } from '../repositories/SQLitePlaylistRepository';
 import { ContinueWatchingItem, WatchProgressRepository } from '../repositories/WatchProgressRepository';
-import { colors, spacing } from '../theme/tokens';
+import { colors, gradients, spacing } from '../theme/tokens';
 import type { Channel, Playlist } from '../types/domain';
 
 const discovery = new DiscoveryRepository();
@@ -37,7 +38,7 @@ export function HomeScreen() {
   return <Screen navigation><ScrollView contentContainerStyle={[styles.container, compact && styles.containerCompact]}>
     <PageHeader eyebrow="NEXUSPLAYER" title="Bonsoir" subtitle={playlists.length ? `${playlists.length} source${playlists.length > 1 ? 's' : ''} prête${playlists.length > 1 ? 's' : ''} à regarder` : 'Votre médiathèque personnelle, sans contenu imposé.'} action={<View style={[styles.headerActions, compact && styles.headerActionsCompact]}><ActionButton icon="add" label="Ajouter une source" onPress={() => router.push('/add-playlist')} style={compact && styles.headerButton} /><ActionButton icon="search" label="Rechercher" onPress={() => router.push('/(tabs)/search')} style={compact && styles.headerButton} variant="secondary" /></View>} />
     {loading ? <LoadingSkeleton rows={5} /> : playlists.length === 0 ? <EmptyState icon="add-circle-outline" title="Ajoutez votre première source" detail="Importez une playlist M3U ou connectez un abonnement Xtream Codes que vous êtes autorisé à utiliser." action={<ActionButton autoFocus icon="add" label="Ajouter une source" onPress={() => router.push('/add-playlist')} />} /> : <>
-      <Panel style={[styles.hero, compact && styles.heroCompact]}><View style={styles.heroText}><Text style={styles.heroEyebrow}>{recent[0] ? 'REPRENDRE' : 'EN DIRECT MAINTENANT'}</Text><Text numberOfLines={2} style={[styles.heroTitle, compact && styles.heroTitleCompact]}>{hero?.name ?? 'Votre Live est prêt'}</Text><Text style={styles.heroDescription}>Retrouvez immédiatement votre dernière chaîne ou explorez le direct.</Text><ActionButton autoFocus icon="play" label="Regarder" onPress={() => hero && play(hero)} /></View></Panel>
+      <Panel style={[styles.hero, compact && styles.heroCompact]}><LinearGradient colors={gradients.hero} end={{ x: 1, y: 1 }} pointerEvents="none" start={{ x: 0, y: 0 }} style={StyleSheet.absoluteFill} /><View style={styles.heroText}><Text style={styles.heroEyebrow}>{recent[0] ? 'REPRENDRE' : 'EN DIRECT MAINTENANT'}</Text><Text numberOfLines={2} style={[styles.heroTitle, compact && styles.heroTitleCompact]}>{hero?.name ?? 'Votre Live est prêt'}</Text><Text style={styles.heroDescription}>Retrouvez immédiatement votre dernière chaîne ou explorez le direct.</Text><ActionButton autoFocus icon="play" label="Regarder" onPress={() => hero && play(hero)} /></View></Panel>
       {continueWatching.length > 0 && <ContentRail data={continueWatching} keyExtractor={(item) => `${item.mediaKind}:${item.mediaId}`} renderItem={({ item }) => <MediaPoster imageUrl={item.imageUrl} meta={`${item.subtitle ? `${item.subtitle} · ` : ''}Reprendre à ${Math.floor(item.positionSeconds / 60)} min`} onPress={() => resume(item)} progress={item.positionSeconds / item.durationSeconds} title={item.title} />} title="Continuer à regarder" />}
       {recent.length > 0 && <ContentRail data={recent} keyExtractor={(item) => item.id} renderItem={({ item }) => <ChannelTile channel={item} onPress={() => play(item)} />} title="Reprendre" />}
       <ContentRail data={live} keyExtractor={(item) => item.id} renderItem={({ item }) => <ChannelTile channel={item} onPress={() => play(item)} />} title="En direct maintenant" />
