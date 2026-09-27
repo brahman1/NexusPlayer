@@ -37,6 +37,7 @@ export function ChannelListScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const showPreview = width >= 1100;
+  const compact = width < 600;
   const [channels, setChannels] = useState<Channel[]>([]);
   const [categories, setCategories] = useState<ChannelCategory[]>([]);
   const [search, setSearch] = useState('');
@@ -134,9 +135,9 @@ export function ChannelListScreen() {
 
   return (
     <Screen navigation>
-      <View style={styles.container}>
-        <View style={styles.heading}>
-          <Text style={styles.title}>Chaînes</Text>
+      <View style={[styles.container, compact && styles.containerCompact]}>
+        <View style={[styles.heading, compact && styles.headingCompact]}>
+          <Text style={[styles.title, compact && styles.titleCompact]}>Chaînes</Text>
           {!loading && <Text style={styles.resultCount}>{totalCount} résultats</Text>}
         </View>
         <TextInput
@@ -224,8 +225,11 @@ export function ChannelListScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: spacing.xl },
+  containerCompact: { padding: 12 },
   heading: { alignItems: 'baseline', flexDirection: 'row', gap: spacing.md },
+  headingCompact: { flexWrap: 'wrap' },
   title: { color: colors.text, fontSize: 36, fontWeight: '900' },
+  titleCompact: { fontSize: 28 },
   resultCount: { color: colors.textMuted, fontSize: 16 },
   search: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radii.md, borderWidth: 1, color: colors.text, fontSize: 17, marginTop: spacing.md, minHeight: 54, paddingHorizontal: spacing.md },
   filterScroller: { flexGrow: 0, flexShrink: 0, height: 70 },
@@ -246,14 +250,14 @@ const styles = StyleSheet.create({
   previewMeta: { color: colors.textMuted, fontSize: 14, lineHeight: 20 },
   previewHint: { color: colors.textMuted, fontSize: 12, marginTop: 'auto' },
   row: { flexDirection: 'row', gap: spacing.sm },
-  card: { alignItems: 'center', flex: 1, flexDirection: 'row', minHeight: 86, paddingVertical: spacing.sm },
+  card: { alignItems: 'center', flex: 1, flexDirection: 'row', minHeight: 76, padding: spacing.sm },
   channelText: { flex: 1, marginLeft: spacing.md },
   channelName: { color: colors.text, fontSize: 18, fontWeight: '700' },
   meta: { color: colors.textMuted, fontSize: 13, marginTop: spacing.xs },
   logo: { height: 54, width: 72 },
   logoFallback: { alignItems: 'center', backgroundColor: colors.surfaceRaised, borderRadius: radii.sm, height: 54, justifyContent: 'center', width: 72 },
   logoLetter: { color: colors.accentStrong, fontSize: 22, fontWeight: '900' },
-  favoriteButton: { alignItems: 'center', justifyContent: 'center', minHeight: 86, paddingHorizontal: spacing.md },
+  favoriteButton: { alignItems: 'center', justifyContent: 'center', minHeight: 76, padding: spacing.sm },
   empty: { color: colors.textMuted, fontSize: 17, marginTop: spacing.xl },
   error: { color: colors.danger, marginTop: spacing.md },
 });

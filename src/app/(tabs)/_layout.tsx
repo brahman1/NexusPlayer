@@ -7,6 +7,9 @@ import { colors } from '../../theme/tokens';
 const icons = {
   index: 'home-outline',
   live: 'radio-outline',
+  movies: 'film-outline',
+  series: 'albums-outline',
+  more: 'grid-outline',
   search: 'search-outline',
   'my-list': 'bookmark-outline',
   library: 'library-outline',
@@ -26,9 +29,12 @@ export default function TabLayout() {
               backgroundColor: colors.surface,
               borderTopColor: colors.border,
               height: 66,
-              paddingBottom: 8,
-              paddingTop: 8,
+              paddingBottom: 7,
+              paddingTop: 7,
             },
+        tabBarAllowFontScaling: false,
+        tabBarHideOnKeyboard: true,
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '700' },
         tabBarIcon: ({ color, size }) => (
           <Ionicons
             color={color}
@@ -40,12 +46,13 @@ export default function TabLayout() {
     >
       <Tabs.Screen name="index" options={{ title: 'Accueil' }} />
       <Tabs.Screen name="live" options={{ title: 'Live' }} />
-      <Tabs.Screen name="search" options={{ title: 'Explorer' }} />
-      <Tabs.Screen name="my-list" options={{ title: 'Ma liste' }} />
-      <Tabs.Screen name="settings" options={{ title: 'Profil' }} />
+      <Tabs.Screen name="movies" options={{ title: 'Films' }} />
+      <Tabs.Screen name="series" options={{ title: 'Séries' }} />
+      <Tabs.Screen name="more" options={{ title: 'Plus' }} />
+      <Tabs.Screen name="search" options={{ href: null }} />
+      <Tabs.Screen name="my-list" options={{ href: null }} />
+      <Tabs.Screen name="settings" options={{ href: null }} />
       <Tabs.Screen name="guide" options={{ href: null }} />
-      <Tabs.Screen name="movies" options={{ href: null }} />
-      <Tabs.Screen name="series" options={{ href: null }} />
       <Tabs.Screen name="library" options={{ href: null }} />
     </Tabs>
   );

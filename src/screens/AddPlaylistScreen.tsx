@@ -35,6 +35,7 @@ const sourceOptions = [
 export function AddPlaylistScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
+  const compact = !Platform.isTV && width < 600;
   const cardWidth = width >= 1100 ? '47%' : width >= 680 ? '46%' : '100%';
   const [mode, setMode] = useState<Mode>('chooser');
   const [name, setName] = useState('Ma playlist');
@@ -139,9 +140,9 @@ export function AddPlaylistScreen() {
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={[styles.container, compact && styles.containerCompact]} keyboardShouldPersistTaps="handled">
         <Text style={styles.eyebrow}>NOUVELLE SOURCE</Text>
-        <Text style={styles.title}>{mode === 'chooser' ? 'Comment souhaitez-vous importer vos contenus ?' : mode === 'xtream' ? 'Connecter Xtream Codes' : 'Importer un lien M3U'}</Text>
+        <Text style={[styles.title, compact && styles.titleCompact]}>{mode === 'chooser' ? 'Comment souhaitez-vous importer vos contenus ?' : mode === 'xtream' ? 'Connecter Xtream Codes' : 'Importer un lien M3U'}</Text>
         <Text style={styles.subtitle}>Utilisez uniquement des playlists et abonnements que vous êtes autorisé à consulter.</Text>
 
         {mode === 'chooser' ? (
@@ -168,9 +169,9 @@ export function AddPlaylistScreen() {
             <TextInput autoFocus editable={!busy} maxLength={80} onChangeText={setName} onSubmitEditing={() => urlInputRef.current?.focus()} placeholder="Ma playlist" placeholderTextColor={colors.textMuted} returnKeyType="next" style={styles.input} value={name} />
             <Text style={styles.label}>Adresse M3U</Text>
             <TextInput autoCapitalize="none" autoCorrect={false} editable={!busy} keyboardType="url" onChangeText={setUrl} onEndEditing={() => { if (url.trim()) void submitUrl(); }} onSubmitEditing={() => void submitUrl()} placeholder="https://exemple.com/playlist.m3u" placeholderTextColor={colors.textMuted} ref={urlInputRef} returnKeyType="go" style={styles.input} value={url} />
-            <View style={styles.actions}>
-              <PrimaryButton disabled={busy} label="Importer" onPress={() => void submitUrl()} />
-              <PrimaryButton disabled={busy} label="Retour" onPress={() => setMode('chooser')} />
+            <View style={[styles.actions, compact && styles.actionsCompact]}>
+              <PrimaryButton disabled={busy} label="Importer" onPress={() => void submitUrl()} style={compact && styles.buttonCompact} />
+              <PrimaryButton disabled={busy} label="Retour" onPress={() => setMode('chooser')} style={compact && styles.buttonCompact} />
             </View>
           </View>
         ) : (
@@ -183,9 +184,9 @@ export function AddPlaylistScreen() {
             <TextInput autoCapitalize="none" autoCorrect={false} editable={!busy} onChangeText={setUsername} placeholder="Identifiant" placeholderTextColor={colors.textMuted} style={styles.input} value={username} />
             <Text style={styles.label}>Mot de passe</Text>
             <TextInput autoCapitalize="none" autoCorrect={false} editable={!busy} onChangeText={setPassword} onEndEditing={() => { if (password) void submitXtream(); }} onSubmitEditing={() => void submitXtream()} placeholder="Mot de passe" placeholderTextColor={colors.textMuted} secureTextEntry style={styles.input} value={password} />
-            <View style={styles.actions}>
-              <PrimaryButton disabled={busy} label="Connecter" onPress={() => void submitXtream()} />
-              <PrimaryButton disabled={busy} label="Retour" onPress={() => setMode('chooser')} />
+            <View style={[styles.actions, compact && styles.actionsCompact]}>
+              <PrimaryButton disabled={busy} label="Connecter" onPress={() => void submitXtream()} style={compact && styles.buttonCompact} />
+              <PrimaryButton disabled={busy} label="Retour" onPress={() => setMode('chooser')} style={compact && styles.buttonCompact} />
             </View>
           </View>
         )}
@@ -207,8 +208,10 @@ export function AddPlaylistScreen() {
 
 const styles = StyleSheet.create({
   container: { padding: spacing.xl },
+  containerCompact: { padding: 20, paddingBottom: 80 },
   eyebrow: { color: colors.accentStrong, fontSize: 13, fontWeight: '800', letterSpacing: 2 },
   title: { color: colors.text, fontSize: 36, fontWeight: '900', letterSpacing: -1, marginTop: spacing.sm, maxWidth: 780 },
+  titleCompact: { fontSize: 28, lineHeight: 34 },
   subtitle: { color: colors.textMuted, fontSize: 17, lineHeight: 25, marginTop: spacing.md, maxWidth: 700 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginTop: spacing.xl },
   card: { minHeight: 190 },
@@ -220,6 +223,8 @@ const styles = StyleSheet.create({
   label: { color: colors.text, fontSize: 15, fontWeight: '700', marginTop: spacing.md },
   input: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radii.md, borderWidth: 1, color: colors.text, fontSize: 17, minHeight: 56, paddingHorizontal: spacing.md },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginTop: spacing.lg },
+  actionsCompact: { flexDirection: 'column' },
+  buttonCompact: { alignSelf: 'stretch', width: '100%' },
   feedback: { alignItems: 'center', flexDirection: 'row', gap: spacing.md, marginTop: spacing.xl },
   status: { color: colors.success, flex: 1, fontSize: 16 },
   error: { color: colors.danger, fontSize: 16, lineHeight: 23, marginTop: spacing.lg, maxWidth: 760 },

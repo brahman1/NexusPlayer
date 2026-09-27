@@ -1,12 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import type { PropsWithChildren, ReactNode } from 'react';
-import { FlatList, Platform, StyleSheet, Text, View, type ViewStyle } from 'react-native';
+import { FlatList, Platform, StyleSheet, Text, useWindowDimensions, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { colors, layout, radii, spacing, typography } from '../theme/tokens';
 import { FocusableCard } from './FocusableCard';
 
 export function PageHeader({ eyebrow, title, subtitle, action }: { eyebrow?: string; title: string; subtitle?: string; action?: ReactNode }) {
-  return <View style={styles.header}><View style={styles.headerText}>{eyebrow && <Text style={styles.eyebrow}>{eyebrow}</Text>}<Text style={styles.title}>{title}</Text>{subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}</View>{action}</View>;
+  const { width } = useWindowDimensions();
+  const compact = !Platform.isTV && width < 700;
+  return <View style={[styles.header, compact && styles.headerCompact]}><View style={styles.headerText}>{eyebrow && <Text style={styles.eyebrow}>{eyebrow}</Text>}<Text style={[styles.title, compact && styles.titleCompact]}>{title}</Text>{subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}</View>{action && <View style={[styles.headerAction, compact && styles.headerActionCompact]}>{action}</View>}</View>;
 }
 
 export function ActionButton({ label, icon, variant = 'primary', ...props }: { label: string; icon?: keyof typeof Ionicons.glyphMap; variant?: 'primary' | 'secondary' | 'danger' } & React.ComponentProps<typeof FocusableCard>) {
@@ -38,17 +40,18 @@ export function ContentRail<T>({ data, keyExtractor, renderItem, title }: { data
   return <View style={styles.rail}><SectionTitle>{title}</SectionTitle><FlatList contentContainerStyle={styles.railContent} data={data} horizontal keyExtractor={keyExtractor} renderItem={(info) => <>{renderItem(info)}</>} showsHorizontalScrollIndicator={false} /></View>;
 }
 
-export function Panel({ children, style }: PropsWithChildren<{ style?: ViewStyle }>) { return <View style={[styles.panel, style]}>{children}</View>; }
+export function Panel({ children, style }: PropsWithChildren<{ style?: StyleProp<ViewStyle> }>) { return <View style={[styles.panel, style]}>{children}</View>; }
 
 const textScale = Platform.isTV ? typography.tv : typography.mobile;
 const styles = StyleSheet.create({
-  header: { alignItems: 'flex-end', flexDirection: 'row', gap: spacing.lg, justifyContent: 'space-between' },
+  header: { alignItems: 'flex-end', flexDirection: 'row', gap: spacing.lg, justifyContent: 'space-between' }, headerCompact: { alignItems: 'stretch', flexDirection: 'column', gap: spacing.md },
+  headerAction: { flexShrink: 1 }, headerActionCompact: { width: '100%' },
   headerText: { flex: 1 }, eyebrow: { color: colors.accentStrong, fontSize: 12, fontWeight: '900', letterSpacing: 2 },
-  title: { color: colors.text, fontSize: textScale.pageTitle, fontWeight: '900', letterSpacing: -1, marginTop: spacing.xs },
+  title: { color: colors.text, fontSize: textScale.pageTitle, fontWeight: '900', letterSpacing: -1, marginTop: spacing.xs }, titleCompact: { fontSize: 27, lineHeight: 33 },
   subtitle: { color: colors.textMuted, fontSize: textScale.body, lineHeight: 24, marginTop: spacing.sm },
   button: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm, minHeight: Platform.isTV ? layout.tvTargetHeight : layout.touchTarget, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
   primary: { backgroundColor: colors.accent, borderColor: colors.accentStrong }, danger: { backgroundColor: '#351720', borderColor: colors.danger },
-  buttonText: { color: colors.text, fontSize: 16, fontWeight: '800' },
+  buttonText: { color: colors.text, flexShrink: 1, fontSize: 16, fontWeight: '800', textAlign: 'center' },
   chip: { minHeight: 44, minWidth: 92, paddingHorizontal: spacing.md, paddingVertical: spacing.sm }, chipActive: { backgroundColor: colors.accent, borderColor: colors.accentStrong },
   chipText: { color: colors.textMuted, fontSize: 14, fontWeight: '700' }, chipTextActive: { color: colors.text },
   banner: { alignItems: 'center', backgroundColor: colors.surfaceRaised, borderLeftWidth: 4, borderRadius: radii.md, flexDirection: 'row', gap: spacing.md, padding: spacing.md },

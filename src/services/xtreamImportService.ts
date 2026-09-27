@@ -1,4 +1,5 @@
 import { storeXtreamCatalog } from '../repositories/XtreamImportRepository';
+import { Platform } from 'react-native';
 import { deleteCredentials, loadCredentials, saveCredentials } from '../storage/credentialVault';
 import { getDatabase } from '../storage/database';
 import { createId, stableId } from '../utils/ids';
@@ -21,7 +22,14 @@ export async function resolveXtreamChannel(channel: Channel) {
   const source = await database.getFirstAsync<{ endpoint: string }>('SELECT endpoint FROM playlists WHERE id = ?', channel.playlistId);
   const credentials = await loadCredentials(channel.playlistId);
   if (!source?.endpoint || !credentials || !('username' in credentials)) throw new Error('Identifiants Xtream indisponibles sur cet appareil.');
-  return { ...channel, streamUrl: xtreamMediaUrl(source.endpoint, credentials, channel.streamUrl) };
+  const marker = compatibleLiveMarker(channel.streamUrl, Platform.OS);
+  return { ...channel, streamUrl: xtreamMediaUrl(source.endpoint, credentials, marker) };
+}
+
+export function compatibleLiveMarker(marker: string, platform: string) {
+  return platform === 'ios' && /^xtream:\/\/live\/\d+\.ts$/i.test(marker)
+    ? marker.replace(/\.ts$/i, '.m3u8')
+    : marker;
 }
 
 export async function resolveXtreamMedia(playlistId: string, marker: string) {

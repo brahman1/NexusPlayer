@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Text,
   useTVEventHandler,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useVideoPlayer, VideoView, type VideoSource } from 'expo-video';
@@ -73,6 +74,8 @@ function PlayerSurface({ channel, onRetry }: { channel: Channel; onRetry: () => 
 
 export function PlayerScreen() {
   const { channelId } = useLocalSearchParams<{ channelId: string }>();
+  const { width } = useWindowDimensions();
+  const compact = !Platform.isTV && width < 700;
   const [channel, setChannel] = useState<Channel | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [switching, setSwitching] = useState(false);
@@ -128,7 +131,7 @@ export function PlayerScreen() {
 
   return (
     <Screen>
-      <View style={styles.container}>
+      <View style={[styles.container, compact && styles.containerCompact]}>
         {channel ? (
           <PlayerSurface
             channel={channel}
@@ -137,14 +140,14 @@ export function PlayerScreen() {
           />
         ) : !error && <ActivityIndicator color={colors.accentStrong} size="large" />}
         {channel && overlay && (
-          <View style={styles.details}>
+          <View style={[styles.details, compact && styles.detailsCompact]}>
             <View style={styles.channelDetails}>
               <Text numberOfLines={1} style={styles.title}>{channel.name}</Text>
               {programmes[0] && <Text numberOfLines={1} style={styles.now}>Maintenant · {programmes[0].title}</Text>}
               {programmes[1] && <Text numberOfLines={1} style={styles.next}>Ensuite · {programmes[1].title}</Text>}
-              <Text style={styles.hint}>D-pad haut/bas : changer de chaîne</Text>
+              {Platform.isTV && <Text style={styles.hint}>D-pad haut/bas : changer de chaîne</Text>}
             </View>
-            <View style={styles.actions}>
+            <View style={[styles.actions, compact && styles.actionsCompact]}>
               <PlayerAction autoFocus label="Chaîne précédente" onPress={() => void changeChannel('previous')} />
               <PlayerAction label="Chaîne suivante" onPress={() => void changeChannel('next')} />
               <PlayerAction label="Mini-guide" onPress={() => setOverlay('guide')} />
@@ -163,18 +166,21 @@ export function PlayerScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, justifyContent: 'center', padding: spacing.lg },
+  containerCompact: { justifyContent: 'flex-start', padding: spacing.sm },
   playerBlock: { width: '100%' },
   videoFrame: { aspectRatio: 16 / 9, alignSelf: 'center', backgroundColor: '#000', position: 'relative', width: Platform.isTV ? '74%' : '100%' },
   video: { height: '100%', width: '100%' },
   loadingOverlay: { alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.45)', bottom: 0, gap: spacing.md, justifyContent: 'center', left: 0, position: 'absolute', right: 0, top: 0 },
   loadingText: { color: colors.text, fontSize: 16, fontWeight: '700' },
   details: { alignItems: 'center', flexDirection: 'row', gap: spacing.lg, justifyContent: 'space-between', marginTop: spacing.md },
+  detailsCompact: { alignItems: 'stretch', flexDirection: 'column', gap: spacing.md },
   channelDetails: { flex: 1 },
   title: { color: colors.text, fontSize: 22, fontWeight: '800' },
   now: { color: colors.accentStrong, fontSize: 15, fontWeight: '700', marginTop: spacing.xs },
   next: { color: colors.textMuted, fontSize: 14, marginTop: spacing.xs },
   hint: { color: colors.textMuted, fontSize: 13, marginTop: spacing.xs },
   actions: { flexDirection: 'row', gap: spacing.sm },
+  actionsCompact: { flexWrap: 'wrap' },
   action: { minHeight: 48, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   actionLabel: { color: colors.text, fontSize: 14, fontWeight: '700' },
   switching: { color: colors.accentStrong, fontSize: 14, marginTop: spacing.sm },

@@ -31,6 +31,8 @@ export default function RootLayout() {
                 contentStyle: { backgroundColor: colors.background },
                 headerStyle: { backgroundColor: colors.surface },
                 headerTintColor: colors.text,
+                headerBackButtonDisplayMode: 'minimal',
+                headerTitleStyle: { fontSize: 18, fontWeight: '800' },
               }}
             >
               <Stack.Screen name="index" options={{ headerShown: false }} />
