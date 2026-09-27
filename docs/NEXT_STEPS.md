@@ -67,13 +67,62 @@ interrompu et passage automatique à l'épisode suivant avec compte à rebours
 annulable. Validation : ESLint, TypeScript, 13 suites / 39 tests et bundle Android
 TV `dist-tv-resume` réussis.
 
-1. Ajouter la reprise automatique après interruption et le préchargement de la
-   chaîne suivante pour le direct (la reprise VOD est terminée).
-2. Relier les options du lecteur aux pistes audio, sous-titres, qualité et format
-   effectivement exposés par chaque plateforme.
-3. Valider plein écran, orientation et PiP sur Android, iOS et tvOS.
-4. Effectuer les sessions de validation sur appareils physiques Android TV et
-   Apple TV, puis préparer la livraison J9/J11.
+Ne pas reprendre les fonctions VOD déjà terminées. Continuer directement dans
+l'ordre suivant :
+
+1. **Fiabiliser le lecteur Live**
+   - enregistrer la chaîne en cours et relancer automatiquement la lecture après
+     une interruption réseau récupérable ;
+   - ajouter une stratégie de reconnexion avec temporisation et annulation ;
+   - précharger la chaîne précédente/suivante sans exposer les URL sensibles ;
+   - confirmer le zapping haut/bas et précédent/suivant sur appareil Android TV
+     physique, avec retour visuel immédiat et sans flash noir.
+2. **Relier les options vidéo aux capacités réelles du lecteur**
+   - afficher et sélectionner les pistes audio disponibles ;
+   - afficher, sélectionner et désactiver les sous-titres ;
+   - exposer la qualité disponible lorsque le flux est adaptatif ;
+   - appliquer le format d'image choisi et conserver la préférence ;
+   - conserver des erreurs compréhensibles pour les codecs incompatibles, dont
+     HEVC/H.265 4K 10 bits.
+3. **Terminer les comportements par plateforme**
+   - valider plein écran, orientation et Picture-in-Picture sur Android et iOS ;
+   - valider les équivalents compatibles sur Android TV et tvOS ;
+   - vérifier la reprise après arrière-plan, verrouillage et changement
+     d'application sans enregistrer de progression incorrecte.
+4. **Compléter le Guide EPG**
+   - ajouter une grille horaire détaillée avec ligne temporelle ;
+   - ajouter la fiche d'un programme et la navigation par jour/créneau ;
+   - préserver une navigation fluide au toucher et au D-pad avec de grands EPG.
+5. **Finaliser la synchronisation Xtream**
+   - permettre l'actualisation d'une source Xtream existante ;
+   - traiter les catégories, chaînes, films, séries et épisodes ajoutés, modifiés
+     ou supprimés sans perdre les favoris ni la progression ;
+   - conserver le dernier catalogue valide en cas d'erreur du fournisseur ;
+   - fournir un rapport de synchronisation sans journaliser les identifiants.
+6. **Fermer les dettes de catalogue et d'import**
+   - restaurer précisément le défilement et le focus dans les grands catalogues ;
+   - rendre le téléchargement M3U réellement progressif pour les fichiers très
+     volumineux ;
+   - corriger l'avertissement Expo Doctor lié au `node_modules` parent dans
+     l'environnement local, sans modifier les dépendances valides du projet.
+7. **Effectuer la validation physique complète**
+   - tester iPhone, iPad, Android TV physique et Apple TV ;
+   - vérifier HLS adaptatif, MP4, HEVC compatible, audio, sous-titres, reprise,
+     zapping, télécommande et focus ;
+   - effectuer au moins dix minutes de navigation D-pad sans perte de focus ;
+   - mesurer démarrage, recherche, zapping et stabilité, puis corriger les défauts
+     bloquants.
+8. **Préparer et distribuer la bêta iPhone**
+   - suivre `docs/IOS_BETA.md` sur le Mac avec `EXPO_TV=0` ;
+   - compiler l'archive iOS, l'envoyer dans App Store Connect et créer le groupe
+     TestFlight externe ;
+   - inviter le premier testeur, recueillir ses retours et corriger les problèmes
+     avant la préparation des stores.
+9. **Finaliser la livraison J9/J11**
+   - terminer l'accessibilité et les scénarios de panne ;
+   - générer les builds Android, Android TV, iOS et tvOS ;
+   - préparer la politique de confidentialité, les captures, descriptions et
+     informations nécessaires aux stores.
 
 ### Lot IHM 1 — fondations adaptatives
 
@@ -138,9 +187,10 @@ TV `dist-tv-resume` réussis.
 - Faire des tests ciblés pendant chaque lot et une validation complète unique à la
   fin de l'ensemble IHM.
 
-Après cette étape : reprise automatique après interruption, préchargement de la
-chaîne suivante, validation plein écran/orientation/audio/sous-titres/PiP, puis
-finalisation Android TV, Apple TV, appareils mobiles et livraison J9/J11.
+Après ces étapes, les fonctions différenciantes non bloquantes pourront être
+prises dans `docs/ROADMAP.md` : contrôle parental par PIN, profils, interface
+multilingue, passage d'introduction, export des réglages et synchronisation
+multi-appareil chiffrée.
 
 ## Règles permanentes
 
