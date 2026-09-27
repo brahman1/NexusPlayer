@@ -56,7 +56,7 @@ export function EpisodePlayerScreen() {
 
   return <Screen fullscreen={fullscreen}><View style={styles.screen}>
     <Stack.Screen options={{ headerShown: !fullscreen, title: media?.headerTitle ?? 'Épisode' }} />
-    {media?.id === id ? <TrackedVideoPlayer key={media.id} mediaId={media.id} mediaKind="episode" name={media.name} onEnded={onEnded} onFullscreenChange={setFullscreen} resumeSeconds={media.resumeSeconds} uri={media.uri} /> : error ? <Text style={styles.error}>{error}</Text> : <ActivityIndicator color={colors.accentStrong} size="large" />}
+    {media?.id === id ? <TrackedVideoPlayer key={media.id} mediaId={media.id} mediaKind="episode" name={media.name} nextEpisode={media.next ? { name: media.next.name, onPress: playNext } : undefined} onEnded={onEnded} onFullscreenChange={setFullscreen} resumeSeconds={media.resumeSeconds} uri={media.uri} /> : error ? <Text style={styles.error}>{error}</Text> : <ActivityIndicator color={colors.accentStrong} size="large" />}
     {finished && media?.id === id && <Panel style={[styles.nextPanel, compact && styles.nextPanelCompact]}>{media.next ? <><Text style={styles.nextTitle}>Épisode suivant dans {countdown ?? 0} s</Text><Text numberOfLines={2} style={styles.nextName}>{media.next.name}</Text><View style={styles.actions}><ActionButton autoFocus icon="play" label="Lire maintenant" onPress={playNext} /><ActionButton icon="close" label="Annuler" onPress={() => { setCountdown(null); setFinished(false); }} variant="secondary" /></View></> : <Text style={styles.nextTitle}>Série terminée</Text>}</Panel>}
   </View></Screen>;
 }

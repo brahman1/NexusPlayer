@@ -120,7 +120,7 @@ function PlayerSurface({ adjacent, channel, onAutomaticRetry, onRecovered, onRet
   return (
     <View style={styles.playerBlock}>
       <View style={styles.videoFrame}>
-        <VideoView allowsPictureInPicture contentFit={contentFit} fullscreenOptions={{ enable: true }} nativeControls={!Platform.isTV} player={player} style={styles.video} />
+        <VideoView allowsPictureInPicture contentFit={contentFit} fullscreenOptions={{ enable: true }} nativeControls={!Platform.isTV} player={player} startsPictureInPictureAutomatically={!Platform.isTV} style={styles.video} />
         {status === 'loading' && (
           <View pointerEvents="none" style={styles.loadingOverlay}>
             <ActivityIndicator color={colors.accentStrong} size="large" />

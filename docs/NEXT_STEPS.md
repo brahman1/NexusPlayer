@@ -273,6 +273,20 @@ Apple TV.
 - À confirmer sur source réelle : rapidité du seek dépend encore de l'indexation
   du fichier et du serveur ; tester plusieurs films et épisodes du fournisseur.
 
+### Continuité séries et PiP Live — 28 septembre 2026
+
+- Corrigé : « Continuer à regarder » ne présente plus plusieurs épisodes d'une
+  même série ; seul l'épisode interrompu le plus récemment est affiché sous le
+  nom de la série.
+- Sécurisé : à chaque nouvelle progression d'épisode, les anciennes reprises de
+  la même série sont supprimées dans la même transaction SQLite.
+- Ajouté : bouton « Épisode suivant » disponible immédiatement dans les commandes
+  du lecteur, y compris avant la fin et en plein écran, avec libellé accessible.
+- Ajouté : entrée automatique en Picture-in-Picture du lecteur Live lorsque
+  l'utilisateur change d'application sur iOS et Android compatibles.
+- À confirmer sur appareils physiques : PiP Live avec HLS et flux direct TS,
+  ainsi que passage manuel à l'épisode suivant pendant une lecture réelle.
+
 1. **Fiabiliser le lecteur Live**
    - enregistrer la chaîne en cours et relancer automatiquement la lecture après
      une interruption réseau récupérable ;

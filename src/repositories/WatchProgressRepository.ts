@@ -38,12 +38,27 @@ export class WatchProgressRepository {
       return;
     }
     const database = await getDatabase();
-    await database.runAsync(
-      `INSERT INTO watch_progress (media_id, media_kind, position_seconds, duration_seconds, updated_at)
-       VALUES (?, ?, ?, ?, ?)
-       ON CONFLICT(media_id, media_kind) DO UPDATE SET position_seconds = excluded.position_seconds, duration_seconds = excluded.duration_seconds, updated_at = excluded.updated_at`,
-      mediaId, mediaKind, positionSeconds, durationSeconds, new Date().toISOString(),
-    );
+    const persist = async () => {
+      if (mediaKind === 'episode') {
+        await database.runAsync(
+          `DELETE FROM watch_progress
+           WHERE media_kind = 'episode' AND media_id <> ? AND media_id IN (
+             SELECT sibling.id FROM episodes sibling
+             JOIN episodes current ON current.series_id = sibling.series_id
+             WHERE current.id = ?
+           )`,
+          mediaId, mediaId,
+        );
+      }
+      await database.runAsync(
+        `INSERT INTO watch_progress (media_id, media_kind, position_seconds, duration_seconds, updated_at)
+         VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(media_id, media_kind) DO UPDATE SET position_seconds = excluded.position_seconds, duration_seconds = excluded.duration_seconds, updated_at = excluded.updated_at`,
+        mediaId, mediaKind, positionSeconds, durationSeconds, new Date().toISOString(),
+      );
+    };
+    if (mediaKind === 'episode') await database.withTransactionAsync(persist);
+    else await persist();
   }
 
   async clear(mediaId: string, mediaKind: 'movie' | 'episode') {
@@ -54,16 +69,24 @@ export class WatchProgressRepository {
   async continueWatching(limit = 16): Promise<ContinueWatchingItem[]> {
     const database = await getDatabase();
     return database.getAllAsync<ContinueWatchingItem>(
-      `SELECT wp.media_id AS mediaId, wp.media_kind AS mediaKind, wp.position_seconds AS positionSeconds,
+      `WITH latest_series_progress AS (
+         SELECT wp.media_id, wp.media_kind, wp.position_seconds, wp.duration_seconds, wp.updated_at,
+                ep.name AS episode_name, ep.season_number, ep.episode_number, ep.series_id,
+                ROW_NUMBER() OVER (PARTITION BY ep.series_id ORDER BY wp.updated_at DESC) AS series_rank
+         FROM watch_progress wp
+         JOIN episodes ep ON wp.media_kind = 'episode' AND ep.id = wp.media_id
+       )
+       SELECT wp.media_id AS mediaId, wp.media_kind AS mediaKind, wp.position_seconds AS positionSeconds,
               wp.duration_seconds AS durationSeconds, wp.updated_at AS updatedAt,
               m.name AS title, NULL AS subtitle, m.poster_url AS imageUrl
        FROM watch_progress wp JOIN movies m ON wp.media_kind = 'movie' AND m.id = wp.media_id
        UNION ALL
-       SELECT wp.media_id AS mediaId, wp.media_kind AS mediaKind, wp.position_seconds AS positionSeconds,
-              wp.duration_seconds AS durationSeconds, wp.updated_at AS updatedAt,
-              ep.name AS title, s.name || ' · S' || ep.season_number || ' E' || ep.episode_number AS subtitle, s.poster_url AS imageUrl
-       FROM watch_progress wp JOIN episodes ep ON wp.media_kind = 'episode' AND ep.id = wp.media_id
-       JOIN series s ON s.id = ep.series_id
+       SELECT latest.media_id AS mediaId, latest.media_kind AS mediaKind, latest.position_seconds AS positionSeconds,
+              latest.duration_seconds AS durationSeconds, latest.updated_at AS updatedAt,
+              s.name AS title, 'S' || latest.season_number || ' E' || latest.episode_number || ' · ' || latest.episode_name AS subtitle,
+              s.poster_url AS imageUrl
+       FROM latest_series_progress latest JOIN series s ON s.id = latest.series_id
+       WHERE latest.series_rank = 1
        ORDER BY updatedAt DESC LIMIT ?`,
       limit,
     );

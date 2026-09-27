@@ -17,6 +17,7 @@ type Props = {
   mediaId: string;
   mediaKind: 'movie' | 'episode';
   name: string;
+  nextEpisode?: { name: string; onPress: () => void };
   onEnded?: () => void | Promise<void>;
   onFullscreenChange?: (fullscreen: boolean) => void;
   resumeSeconds: number;
@@ -29,7 +30,7 @@ function playableTracks(items: MediaTrack[]) {
   return items.filter((item, index) => item.id >= 0 && items.findIndex((candidate) => candidate.id === item.id) === index);
 }
 
-export function TrackedVideoPlayer({ mediaId, mediaKind, name, onEnded, onFullscreenChange, resumeSeconds, uri }: Props) {
+export function TrackedVideoPlayer({ mediaId, mediaKind, name, nextEpisode, onEnded, onFullscreenChange, resumeSeconds, uri }: Props) {
   const { width } = useWindowDimensions();
   const compact = !Platform.isTV && width < 600;
   const playerRef = useRef<LibVlcPlayerViewRef>(null);
@@ -290,6 +291,7 @@ export function TrackedVideoPlayer({ mediaId, mediaKind, name, onEnded, onFullsc
         <ControlButton compact={compact} icon="play-forward" label="+30 s" onPress={() => void seekBy(30)} style={styles.transportButton} />
       </View>
       <View style={styles.secondaryControls}>
+        {nextEpisode && <ControlButton accessibilityLabel={`Lire l’épisode suivant, ${nextEpisode.name}`} compact={compact} icon="play-skip-forward" label="Épisode suivant" onPress={nextEpisode.onPress} style={compact && styles.secondaryButtonCompact} />}
         <ControlButton compact={compact} icon="volume-high" label="Audio" onPress={() => setTrackPanel((value) => value === 'audio' ? null : 'audio')} style={compact && styles.secondaryButtonCompact} />
         <ControlButton compact={compact} icon="text" label="Sous-titres" onPress={() => setTrackPanel((value) => value === 'subtitle' ? null : 'subtitle')} style={compact && styles.secondaryButtonCompact} />
         {!Platform.isTV && <ControlButton compact={compact} icon="albums-outline" label="Image dans l’image" onPress={() => void startPictureInPicture()} style={compact && styles.secondaryButtonCompact} />}
@@ -320,8 +322,8 @@ function TrackButton({ active, label, onPress }: { active: boolean; label: strin
   return <Pressable accessibilityRole="button" onPress={onPress} style={[styles.trackButton, active && styles.trackButtonActive]}><Text style={styles.trackButtonText}>{active ? `✓ ${label}` : label}</Text></Pressable>;
 }
 
-function ControlButton({ compact = false, icon, label, onPress, primary = false, style }: { compact?: boolean; icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void; primary?: boolean; style?: StyleProp<ViewStyle> }) {
-  return <Pressable accessibilityLabel={label} accessibilityRole="button" onPress={onPress} style={({ focused, pressed }) => [styles.controlButton, compact && styles.controlButtonCompact, primary && styles.controlButtonPrimary, (focused || pressed) && styles.controlButtonFocused, style]}>
+function ControlButton({ accessibilityLabel, compact = false, icon, label, onPress, primary = false, style }: { accessibilityLabel?: string; compact?: boolean; icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void; primary?: boolean; style?: StyleProp<ViewStyle> }) {
+  return <Pressable accessibilityLabel={accessibilityLabel ?? label} accessibilityRole="button" onPress={onPress} style={({ focused, pressed }) => [styles.controlButton, compact && styles.controlButtonCompact, primary && styles.controlButtonPrimary, (focused || pressed) && styles.controlButtonFocused, style]}>
     <Ionicons color={colors.text} name={icon} size={compact ? 19 : 22} />
     <Text adjustsFontSizeToFit maxFontSizeMultiplier={1.25} numberOfLines={1} style={[styles.controlLabel, compact && styles.controlLabelCompact]}>{label}</Text>
   </Pressable>;
