@@ -71,6 +71,11 @@ HTTP configurées par l'utilisateur. Une simple actualisation JavaScript ne suff
 pas après une modification d'App Transport Security : il faut reconstruire et
 réinstaller l'application native.
 
+NexusPlayer utilise également un lecteur VLC natif pour les films et les séries
+(notamment MKV et HEVC). Après l'ajout ou la mise à jour de ce lecteur, une simple
+actualisation Metro/Expo ne suffit pas non plus : `prebuild`, `pod-install`, puis
+une nouvelle compilation Xcode sont obligatoires.
+
 ## 5. Ouvrir le projet dans Xcode
 
 ```bash

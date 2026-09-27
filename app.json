@@ -35,13 +35,20 @@
         {
           "androidTVRequired": false,
           "removeFlipperOnAndroid": true,
-          "tvosDeploymentTarget": "15.1"
+          "tvosDeploymentTarget": "16.4"
         }
       ],
       [
         "expo-video",
         {
           "supportsBackgroundPlayback": true,
+          "supportsPictureInPicture": true
+        }
+      ],
+      [
+        "expo-libvlc-player",
+        {
+          "localNetworkPermission": "Autoriser NexusPlayer à accéder au réseau local pour lire vos sources.",
           "supportsPictureInPicture": true
         }
       ],
