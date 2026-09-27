@@ -90,6 +90,48 @@ Le prochain chantier implémentable est désormais le point 4, **Compléter le
 Guide EPG**. Les validations physiques restantes des points 1 à 3 sont regroupées
 au point 7 et ne doivent pas bloquer le développement du Guide.
 
+### Reste à faire — ordre de reprise obligatoire
+
+Quand l'utilisateur demande de continuer, reprendre directement cette liste sans
+réanalyser les travaux déjà terminés :
+
+1. **Guide EPG complet**
+   - construire la grille horaire avec ligne temporelle du direct ;
+   - ajouter la navigation par jour et par créneau ;
+   - ajouter la fiche détaillée d'un programme ;
+   - garantir les performances au toucher et au D-pad sur les grands guides.
+2. **Synchronisation Xtream complète**
+   - actualiser une source Xtream existante ;
+   - synchroniser les ajouts, modifications et suppressions des catégories,
+     chaînes, films, séries et épisodes ;
+   - préserver les favoris et progressions ;
+   - conserver le dernier catalogue valide en cas d'échec ;
+   - produire un rapport sans identifiants ni URL sensibles.
+3. **Catalogue et imports volumineux**
+   - restaurer précisément le défilement et le focus ;
+   - rendre le téléchargement M3U réellement progressif ;
+   - corriger l'avertissement Expo Doctor causé par le `node_modules` parent.
+4. **Validation physique multiplateforme**
+   - tester iPhone, iPad, Android TV physique et Apple TV ;
+   - vérifier Live, HLS adaptatif, MP4, HEVC compatible, films, séries, audio,
+     sous-titres, reprise, épisode suivant, zapping, PiP et plein écran ;
+   - vérifier l'arrière-plan, le verrouillage et le changement d'application ;
+   - effectuer dix minutes de navigation D-pad sans perte de focus ;
+   - confirmer l'absence de flash noir pendant le zapping.
+5. **Bêta iPhone avec TestFlight**
+   - générer et tester l'archive iOS sur Mac ;
+   - envoyer le build dans App Store Connect ;
+   - créer le groupe TestFlight, inviter le premier testeur et traiter ses retours.
+6. **Livraison finale**
+   - terminer l'accessibilité et les scénarios de panne ;
+   - générer les builds Android, Android TV, iOS et tvOS ;
+   - préparer la politique de confidentialité, les captures, descriptions et
+     informations demandées par les stores.
+
+Les quatre premiers points sont les prochains chantiers de développement. Les
+points 5 et 6 nécessitent les comptes, appareils et validations de distribution
+du propriétaire de l'application.
+
 1. **Fiabiliser le lecteur Live**
    - enregistrer la chaîne en cours et relancer automatiquement la lecture après
      une interruption réseau récupérable ;
