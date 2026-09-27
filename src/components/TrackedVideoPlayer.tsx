@@ -3,7 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LibVlcPlayerView, type LibVlcPlayerViewRef, type MediaTrack, type Tracks } from 'expo-libvlc-player';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { WatchProgressRepository } from '../repositories/WatchProgressRepository';
@@ -11,7 +11,7 @@ import { describePlaybackError } from '../services/playbackError';
 import { colors, radii, spacing } from '../theme/tokens';
 
 const progressRepository = new WatchProgressRepository();
-const VOD_PLAYER_OPTIONS = ['--network-caching=1000', '--input-fast-seek', '--http-reconnect'];
+const VOD_PLAYER_OPTIONS = ['--network-caching=750', '--input-fast-seek', '--http-reconnect'];
 
 type Props = {
   mediaId: string;
@@ -59,6 +59,12 @@ export function TrackedVideoPlayer({ mediaId, mediaKind, name, nextEpisode, onEn
   const [tracks, setTracks] = useState<Tracks>({ subtitle: -1 });
   const [controlsVisible, setControlsVisible] = useState(true);
   const playbackError = error ? describePlaybackError(error) : null;
+  const playerOptions = useMemo(
+    () => resumeSeconds >= 10
+      ? [...VOD_PLAYER_OPTIONS, `--start-time=${Math.floor(resumeSeconds)}`]
+      : VOD_PLAYER_OPTIONS,
+    [resumeSeconds],
+  );
 
   const enqueueSave = useCallback((force = false) => {
     if (completed.current) return;
@@ -252,11 +258,10 @@ export function TrackedVideoPlayer({ mediaId, mediaKind, name, nextEpisode, onEn
           }
           enqueueSave();
         }}
-        options={VOD_PLAYER_OPTIONS}
+        options={playerOptions}
         pictureInPicture
         source={uri}
         style={styles.video}
-        time={resumeSeconds >= 10 ? Math.round(resumeSeconds * 1000) : 0}
         tracks={tracks}
       />
       {fullscreen && <Pressable accessibilityLabel={controlsVisible ? 'Masquer les commandes' : 'Afficher les commandes'} accessibilityRole="button" onPress={() => { if (controlsVisible) { clearControlsTimer(); setControlsVisible(false); } else revealControls(); }} style={styles.fullscreenTouchLayer} />}

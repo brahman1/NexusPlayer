@@ -7,12 +7,36 @@ import { createId, stableId } from '../utils/ids';
 import { fetchXtreamCatalog, fetchXtreamSeriesEpisodes, normalizeXtreamServer, xtreamMediaUrl } from './xtreamClient';
 import type { Channel, Playlist, XtreamCredentials } from '../types/domain';
 
+type XtreamAccess = { endpoint: string; credentials: XtreamCredentials };
+const xtreamAccessCache = new Map<string, Promise<XtreamAccess>>();
+
+function cacheXtreamAccess(playlistId: string, endpoint: string, credentials: XtreamCredentials) {
+  xtreamAccessCache.set(playlistId, Promise.resolve({ endpoint, credentials }));
+}
+
+async function loadXtreamAccess(playlistId: string): Promise<XtreamAccess> {
+  const cached = xtreamAccessCache.get(playlistId);
+  if (cached) return cached;
+  const pending = Promise.all([
+    getDatabase().then((database) => database.getFirstAsync<{ endpoint: string }>('SELECT endpoint FROM playlists WHERE id = ?', playlistId)),
+    loadCredentials(playlistId),
+  ]).then(([source, credentials]) => {
+    if (!source?.endpoint || !credentials || !('username' in credentials)) throw new Error('Identifiants Xtream indisponibles sur cet appareil.');
+    return { endpoint: source.endpoint, credentials };
+  }).catch((error) => {
+    xtreamAccessCache.delete(playlistId);
+    throw error;
+  });
+  xtreamAccessCache.set(playlistId, pending);
+  return pending;
+}
+
 export async function importXtream(name: string, serverUrl: string, credentials: XtreamCredentials) {
   const endpoint = normalizeXtreamServer(serverUrl);
   const playlistId = createId('playlist');
   const catalog = await fetchXtreamCatalog(endpoint, credentials);
   const counts = await storeXtreamCatalog(playlistId, name, endpoint, stableId('xtream-source', `${endpoint}\0${credentials.username}`), catalog);
-  try { await saveCredentials(playlistId, credentials); }
+  try { await saveCredentials(playlistId, credentials); cacheXtreamAccess(playlistId, endpoint, credentials); }
   catch (error) { await getDatabase().then((db) => db.runAsync('DELETE FROM playlists WHERE id = ?', playlistId)); throw error; }
   return { playlistId, ...counts };
 }
@@ -44,12 +68,9 @@ export async function refreshXtreamPlaylist(playlist: Playlist) {
 
 export async function resolveXtreamChannel(channel: Channel) {
   if (!channel.streamUrl.startsWith('xtream://')) return channel;
-  const database = await getDatabase();
-  const source = await database.getFirstAsync<{ endpoint: string }>('SELECT endpoint FROM playlists WHERE id = ?', channel.playlistId);
-  const credentials = await loadCredentials(channel.playlistId);
-  if (!source?.endpoint || !credentials || !('username' in credentials)) throw new Error('Identifiants Xtream indisponibles sur cet appareil.');
+  const { endpoint, credentials } = await loadXtreamAccess(channel.playlistId);
   const marker = compatibleLiveMarker(channel.streamUrl, Platform.OS);
-  return { ...channel, streamUrl: xtreamMediaUrl(source.endpoint, credentials, marker) };
+  return { ...channel, streamUrl: xtreamMediaUrl(endpoint, credentials, marker) };
 }
 
 export function compatibleLiveMarker(marker: string, platform: string) {
@@ -60,11 +81,8 @@ export function compatibleLiveMarker(marker: string, platform: string) {
 
 export async function resolveXtreamMedia(playlistId: string, marker: string) {
   if (!marker.startsWith('xtream://')) return marker;
-  const database = await getDatabase();
-  const source = await database.getFirstAsync<{ endpoint: string }>('SELECT endpoint FROM playlists WHERE id = ?', playlistId);
-  const credentials = await loadCredentials(playlistId);
-  if (!source?.endpoint || !credentials || !('username' in credentials)) throw new Error('Identifiants Xtream indisponibles sur cet appareil.');
-  return xtreamMediaUrl(source.endpoint, credentials, marker);
+  const { endpoint, credentials } = await loadXtreamAccess(playlistId);
+  return xtreamMediaUrl(endpoint, credentials, marker);
 }
 
 export async function syncXtreamSeriesEpisodes(seriesId: string) {
@@ -91,4 +109,4 @@ export async function syncXtreamSeriesEpisodes(seriesId: string) {
   return episodes.length;
 }
 
-export async function removeXtreamCredentials(playlistId: string) { await deleteCredentials(playlistId); }
+export async function removeXtreamCredentials(playlistId: string) { xtreamAccessCache.delete(playlistId); await deleteCredentials(playlistId); }

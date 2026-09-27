@@ -287,6 +287,19 @@ Apple TV.
 - À confirmer sur appareils physiques : PiP Live avec HLS et flux direct TS,
   ainsi que passage manuel à l'épisode suivant pendant une lecture réelle.
 
+### Accélération de la reprise VOD — 28 septembre 2026
+
+- Corrigé : la progression est maintenant fournie à VLC avec `start-time` dès
+  l'ouverture du média, au lieu de démarrer à zéro puis d'effectuer un second
+  chargement pour rejoindre l'épisode interrompu.
+- Optimisé : cache réseau VOD ramené à 750 ms tout en conservant la recherche
+  rapide et la reconnexion HTTP.
+- Optimisé : endpoint et identifiants Xtream sont conservés uniquement en mémoire
+  pendant la session ; SecureStore et SQLite ne sont plus relus pour chaque
+  épisode de la même source.
+- La vitesse finale reste dépendante du support des requêtes partielles, de
+  l'indexation du fichier et de la charge du serveur du fournisseur.
+
 1. **Fiabiliser le lecteur Live**
    - enregistrer la chaîne en cours et relancer automatiquement la lecture après
      une interruption réseau récupérable ;
