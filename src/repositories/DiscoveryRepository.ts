@@ -6,6 +6,7 @@ type MovieRow = { id: string; playlist_id: string; category_id: string | null; n
 type SeriesRow = { id: string; playlist_id: string; category_id: string | null; name: string; poster_url: string | null; plot: string | null; is_favorite: number };
 export type GuideItem = { channelId: string; channelName: string; logoUrl: string | null; title: string; startsAt: string; endsAt: string };
 export type SearchResult = { id: string; kind: 'channel' | 'programme' | 'movie' | 'series'; title: string; subtitle: string | null };
+export type CatalogCategory = { id: string; name: string };
 
 const channel = (row: ChannelRow): Channel => ({ id: row.id, playlistId: row.playlist_id, categoryId: row.category_id, name: row.name, displayName: row.display_name || row.name, streamUrl: row.stream_url, tvgId: row.tvg_id, tvgName: row.tvg_name, logoUrl: row.logo_url, language: row.language, country: row.country, isFavorite: row.is_favorite === 1, lastWatchedAt: row.last_watched_at });
 const movie = (row: MovieRow): Movie => ({ id: row.id, playlistId: row.playlist_id, categoryId: row.category_id, name: row.name, streamUrl: row.stream_url, posterUrl: row.poster_url, plot: row.plot, releaseYear: row.release_year, isFavorite: row.is_favorite === 1 });
@@ -17,6 +18,13 @@ export class DiscoveryRepository {
   async liveNow(limit = 16) { const db = await getDatabase(); return (await db.getAllAsync<ChannelRow>('SELECT * FROM channels ORDER BY COALESCE(last_watched_at, \'\') DESC, sort_name COLLATE NOCASE LIMIT ?', limit)).map(channel); }
   async movies(limit = 100) { const db = await getDatabase(); return (await db.getAllAsync<MovieRow>('SELECT * FROM movies ORDER BY name COLLATE NOCASE LIMIT ?', limit)).map(movie); }
   async series(limit = 100) { const db = await getDatabase(); return (await db.getAllAsync<SeriesRow>('SELECT * FROM series ORDER BY name COLLATE NOCASE LIMIT ?', limit)).map(series); }
+  async recentMovies(limit = 24) { const db = await getDatabase(); return (await db.getAllAsync<MovieRow>('SELECT * FROM movies ORDER BY COALESCE(release_year, 0) DESC, rowid DESC LIMIT ?', limit)).map(movie); }
+  async recentSeries(limit = 24) { const db = await getDatabase(); return (await db.getAllAsync<SeriesRow>('SELECT * FROM series ORDER BY rowid DESC LIMIT ?', limit)).map(series); }
+  async catalogCategories(kind: 'movie' | 'series', limit = 12): Promise<CatalogCategory[]> {
+    const db = await getDatabase();
+    const table = kind === 'movie' ? 'movies' : 'series';
+    return db.getAllAsync<CatalogCategory>(`SELECT c.id, COALESCE(NULLIF(c.display_name, ''), c.name) AS name FROM categories c WHERE c.kind = ? AND EXISTS (SELECT 1 FROM ${table} media WHERE media.category_id = c.id) ORDER BY c.position, c.sort_name COLLATE NOCASE LIMIT ?`, kind, limit);
+  }
   async favoriteMovies(limit = 100) { const db = await getDatabase(); return (await db.getAllAsync<MovieRow>('SELECT * FROM movies WHERE is_favorite = 1 ORDER BY name COLLATE NOCASE LIMIT ?', limit)).map(movie); }
   async favoriteSeries(limit = 100) { const db = await getDatabase(); return (await db.getAllAsync<SeriesRow>('SELECT * FROM series WHERE is_favorite = 1 ORDER BY name COLLATE NOCASE LIMIT ?', limit)).map(series); }
   async movieById(id: string) { const db = await getDatabase(); const row = await db.getFirstAsync<MovieRow>('SELECT * FROM movies WHERE id = ?', id); return row ? movie(row) : null; }

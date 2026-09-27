@@ -448,3 +448,15 @@ La stratégie complète et les objectifs pour dépasser IBO Player restent dans
 `docs/ROADMAP.md`. Le référentiel visuel à appliquer pendant le développement de
 l'IHM est enregistré dans `docs/UI_UX_BLUEPRINT.md` ; la direction Obsidian y est
 la référence principale.
+
+## Catalogue éditorial Films/Séries — réalisé le 28 septembre 2026
+
+- Recherche immédiate dédiée dans chaque catalogue.
+- Mise en avant éditoriale, reprise de lecture, nouvelles sorties/ajouts récents,
+  favoris (« Ma liste ») et rayons issus des catégories Xtream réelles.
+- Résultats en grille adaptative et rayons horizontaux utilisables au tactile et
+  au D-pad sur téléphone, tablette et TV.
+- Aucun contenu de démonstration : les écrans exploitent uniquement les données
+  importées depuis les sources de l'utilisateur.
+- Pour les séries, « Ajouts récents » suit l'ordre d'import local car Xtream ne
+  fournit pas systématiquement une date de sortie exploitable.
