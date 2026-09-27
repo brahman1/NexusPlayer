@@ -12,7 +12,12 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.brahman1.nexusplayer"
+      "bundleIdentifier": "com.brahman1.nexusplayer",
+      "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        }
+      }
     },
     "android": {
       "package": "com.nexusplayer.app",

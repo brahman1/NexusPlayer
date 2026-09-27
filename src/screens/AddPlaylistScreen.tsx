@@ -18,6 +18,7 @@ import { FocusableCard } from '../components/FocusableCard';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { Screen } from '../components/Screen';
 import { importM3uFromFile, importM3uFromUrl } from '../services/m3uImportService';
+import { describeSourceError } from '../services/sourceError';
 import { colors, radii, spacing } from '../theme/tokens';
 import { m3uUrlInputSchema, xtreamInputSchema } from '../types/validation';
 import { importXtream } from '../services/xtreamImportService';
@@ -30,10 +31,6 @@ const sourceOptions = [
   { id: 'm3u-file', icon: 'document-outline' as const, title: 'Fichier local', description: 'Sélectionnez un fichier .m3u ou .m3u8 présent sur l’appareil.', disabled: false },
   { id: 'stalker', icon: 'time-outline' as const, title: 'Portail Stalker', description: 'Prévu pour une version ultérieure après stabilisation du MVP.', disabled: true },
 ] as const;
-
-function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : 'Une erreur inattendue est survenue.';
-}
 
 export function AddPlaylistScreen() {
   const router = useRouter();
@@ -69,7 +66,7 @@ export function AddPlaylistScreen() {
       setTimeout(() => router.replace('/(tabs)/library'), 700);
     } catch (caughtError) {
       setStatus(null);
-      setError(errorMessage(caughtError));
+      setError(describeSourceError(caughtError));
     } finally {
       setBusy(false);
       submissionRef.current = false;
@@ -124,7 +121,7 @@ export function AddPlaylistScreen() {
       const report = await importXtream(parsed.data.name, parsed.data.serverUrl, { username: parsed.data.username, password: parsed.data.password });
       setStatus(`${report.channels} chaînes, ${report.movies} films et ${report.series} séries importés.`);
       setTimeout(() => router.replace('/(tabs)/library'), 700);
-    } catch (caught) { setStatus(null); setError(errorMessage(caught)); }
+    } catch (caught) { setStatus(null); setError(describeSourceError(caught)); }
     finally { setBusy(false); submissionRef.current = false; }
   }
 

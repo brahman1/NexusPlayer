@@ -66,6 +66,11 @@ La commande `prebuild --clean` régénère entièrement le dossier `ios`. Les
 modifications natives manuelles placées dans ce dossier peuvent donc être
 supprimées.
 
+Cette régénération applique aussi l'autorisation iOS nécessaire aux sources IPTV
+HTTP configurées par l'utilisateur. Une simple actualisation JavaScript ne suffit
+pas après une modification d'App Transport Security : il faut reconstruire et
+réinstaller l'application native.
+
 ## 5. Ouvrir le projet dans Xcode
 
 ```bash
