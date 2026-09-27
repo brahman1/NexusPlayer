@@ -111,6 +111,20 @@ export class SQLiteChannelRepository {
     return row ? mapChannel(row) : null;
   }
 
+  async indexOfChannel(playlistId: string, id: string) {
+    const database = await getDatabase();
+    const current = await database.getFirstAsync<Pick<ChannelRow, 'id' | 'name'>>(
+      'SELECT id, name FROM channels WHERE playlist_id = ? AND id = ?', playlistId, id,
+    );
+    if (!current) return null;
+    const row = await database.getFirstAsync<{ position: number }>(
+      `SELECT COUNT(*) AS position FROM channels
+       WHERE playlist_id = ? AND (name COLLATE NOCASE < ? COLLATE NOCASE OR (name = ? COLLATE NOCASE AND id < ?))`,
+      playlistId, current.name, current.name, current.id,
+    );
+    return row?.position ?? 0;
+  }
+
   async findAdjacent(id: string, direction: 'previous' | 'next') {
     const database = await getDatabase();
     const current = await database.getFirstAsync<Pick<ChannelRow, 'id' | 'playlist_id' | 'name'>>(

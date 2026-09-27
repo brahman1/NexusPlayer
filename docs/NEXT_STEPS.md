@@ -107,7 +107,7 @@ réanalyser les travaux déjà terminés :
    - préserver les favoris et progressions ;
    - conserver le dernier catalogue valide en cas d'échec ;
    - produire un rapport sans identifiants ni URL sensibles.
-3. **Catalogue et imports volumineux**
+3. **Catalogue et imports volumineux — terminé automatiquement**
    - restaurer précisément le défilement et le focus ;
    - rendre le téléchargement M3U réellement progressif ;
    - corriger l'avertissement Expo Doctor causé par le `node_modules` parent.
@@ -167,8 +167,28 @@ reprise, **Synchronisation Xtream complète**.
 - À confirmer sur source réelle : suppressions et modifications massives ainsi
   que le comportement d'un fournisseur qui coupe la connexion pendant la synchro.
 
-Le prochain chantier implémentable est désormais le point 3 de la liste de
-reprise, **Catalogue et imports volumineux**.
+### Avancement catalogue et imports volumineux — 27 septembre 2026
+
+- Implémenté : restauration directe de la page contenant la dernière chaîne,
+  repositionnement précis du défilement et restitution du focus mémorisé.
+- Implémenté : pagination bidirectionnelle par blocs de 250 chaînes sans charger
+  tout le catalogue en mémoire.
+- Implémenté : téléchargement M3U par flux avec décodage UTF-8 progressif, limite
+  de 25 Mio et annulation immédiate si la taille maximale est dépassée.
+- Isolé : la résolution Metro est alignée sur l'autolinking avec l'option
+  officielle `autolinkingModuleResolution`. Expo Doctor continue toutefois à
+  signaler le React d'un projet web externe lorsqu'il inspecte les dossiers
+  ancêtres ; les dépendances de NexusPlayer sont conformes et n'ont pas été
+  modifiées pour masquer ce diagnostic environnemental.
+- Validé automatiquement : découpage UTF-8 entre deux blocs, limite de taille,
+  parser M3U, TypeScript, ESLint, 20 suites / 62 tests et bundle Android TV
+  `dist-tv-large-catalog`. Expo Doctor valide 20 contrôles sur 21 ; son seul
+  diagnostic restant est le React 19.2.4 de l'autre projet situé dans le dossier
+  parent, tandis que NexusPlayer utilise la version 19.2.3 attendue par Expo 57.
+
+Le prochain chantier est désormais le point 4 de la liste de reprise,
+**Validation physique multiplateforme**. Il nécessite les appareils du
+propriétaire ; commencer par iPhone/iPad, puis Android TV physique et Apple TV.
 
 1. **Fiabiliser le lecteur Live**
    - enregistrer la chaîne en cours et relancer automatiquement la lecture après

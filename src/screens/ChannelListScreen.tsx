@@ -14,6 +14,7 @@ import type { Channel } from '../types/domain';
 const repository = new SQLiteChannelRepository();
 const epgRepository = new EpgRepository();
 const PAGE_SIZE = 250;
+const ROW_STRIDE = 92;
 type Filter = 'all' | 'favorites' | 'recent' | string;
 
 function FilterButton({ active, label, onPress }: { active: boolean; label: string; onPress: () => void }) {
@@ -45,11 +46,14 @@ export function ChannelListScreen() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
+  const [loadedOffset, setLoadedOffset] = useState(0);
+  const [restoreIndex, setRestoreIndex] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [focusedChannel, setFocusedChannel] = useState<Channel | null>(null);
   const [programmes, setProgrammes] = useState<Awaited<ReturnType<EpgRepository['nowNext']>>>([]);
   const requestVersion = useRef(0);
   const loadingMoreRef = useRef(false);
+  const listRef = useRef<FlatList<Channel>>(null);
   const lastFocusedId = id ? preferences.getLastFocusedChannel(id) : null;
 
   const loadChannels = useCallback(async () => {
@@ -63,13 +67,18 @@ export function ChannelListScreen() {
     };
     try {
       setError(null);
+      const savedId = filter === 'all' && !search ? preferences.getLastFocusedChannel(id) : null;
+      const savedIndex = savedId ? await repository.indexOfChannel(id, savedId) : null;
+      const offset = savedIndex === null ? 0 : Math.floor(savedIndex / PAGE_SIZE) * PAGE_SIZE;
       const [firstPage, total] = await Promise.all([
-        repository.listByPlaylist(id, { ...filters, limit: PAGE_SIZE }),
+        repository.listByPlaylist(id, { ...filters, limit: PAGE_SIZE, offset }),
         repository.countByPlaylist(id, filters),
       ]);
       if (version !== requestVersion.current) return;
       setChannels(firstPage);
-      setFocusedChannel((current) => firstPage.find((item) => item.id === current?.id) ?? firstPage[0] ?? null);
+      setLoadedOffset(offset);
+      setRestoreIndex(savedIndex === null ? null : savedIndex - offset);
+      setFocusedChannel(firstPage.find((item) => item.id === savedId) ?? firstPage[0] ?? null);
       setTotalCount(total);
     } catch (caught) {
       if (version !== requestVersion.current) return;
@@ -91,7 +100,7 @@ export function ChannelListScreen() {
         favoritesOnly: filter === 'favorites',
         recentOnly: filter === 'recent',
         limit: PAGE_SIZE,
-        offset: channels.length,
+        offset: loadedOffset + channels.length,
       });
       if (version === requestVersion.current) {
         setChannels((current) => [...current, ...nextPage]);
@@ -104,7 +113,27 @@ export function ChannelListScreen() {
       loadingMoreRef.current = false;
       if (version === requestVersion.current) setLoadingMore(false);
     }
-  }, [channels.length, filter, id, loading, search, totalCount]);
+  }, [channels.length, filter, id, loadedOffset, loading, search, totalCount]);
+
+  const loadPrevious = useCallback(async () => {
+    if (!id || loading || loadingMoreRef.current || loadedOffset <= 0) return;
+    loadingMoreRef.current = true;
+    setLoadingMore(true);
+    const version = requestVersion.current;
+    const offset = Math.max(0, loadedOffset - PAGE_SIZE);
+    try {
+      const previousPage = await repository.listByPlaylist(id, { limit: loadedOffset - offset, offset });
+      if (version === requestVersion.current) {
+        setChannels((current) => [...previousPage, ...current]);
+        setLoadedOffset(offset);
+      }
+    } catch (caught) {
+      if (version === requestVersion.current) setError(caught instanceof Error ? caught.message : 'Chargement des chaînes précédentes impossible.');
+    } finally {
+      loadingMoreRef.current = false;
+      if (version === requestVersion.current) setLoadingMore(false);
+    }
+  }, [id, loadedOffset, loading]);
 
   useEffect(() => {
     if (!id) return;
@@ -115,6 +144,15 @@ export function ChannelListScreen() {
     if (!focusedChannel) return;
     epgRepository.nowNext(focusedChannel.playlistId, focusedChannel.tvgId, focusedChannel.tvgName, focusedChannel.name).then(setProgrammes).catch(() => setProgrammes([]));
   }, [focusedChannel]);
+
+  useEffect(() => {
+    if (restoreIndex === null || channels.length === 0) return;
+    const timer = setTimeout(() => {
+      listRef.current?.scrollToIndex({ animated: false, index: Math.min(restoreIndex, channels.length - 1), viewPosition: 0.35 });
+      setRestoreIndex(null);
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [channels.length, restoreIndex]);
 
   useFocusEffect(useCallback(() => {
     const timer = setTimeout(() => {
@@ -172,13 +210,18 @@ export function ChannelListScreen() {
             accessibilityLabel={`${channels.length} chaînes chargées sur ${totalCount}`}
             contentContainerStyle={styles.list}
             data={channels}
-            getItemLayout={(_, index) => ({ index, length: 94, offset: 94 * index })}
+            getItemLayout={(_, index) => ({ index, length: ROW_STRIDE, offset: ROW_STRIDE * index })}
             initialNumToRender={14}
             keyExtractor={(item) => item.id}
             ListFooterComponent={loadingMore ? <ActivityIndicator color={colors.accentStrong} style={styles.loadingMore} /> : null}
             maxToRenderPerBatch={18}
+            maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
             onEndReached={() => void loadMore()}
             onEndReachedThreshold={0.6}
+            onScrollToIndexFailed={({ index }) => listRef.current?.scrollToOffset({ animated: false, offset: index * ROW_STRIDE })}
+            onStartReached={() => void loadPrevious()}
+            onStartReachedThreshold={0.4}
+            ref={listRef}
             renderItem={({ item, index }) => (
               <View style={styles.row}>
                 <FocusableCard
@@ -249,7 +292,7 @@ const styles = StyleSheet.create({
   epgTitle: { color: colors.text, fontSize: 18, fontWeight: '800', lineHeight: 24 },
   previewMeta: { color: colors.textMuted, fontSize: 14, lineHeight: 20 },
   previewHint: { color: colors.textMuted, fontSize: 12, marginTop: 'auto' },
-  row: { flexDirection: 'row', gap: spacing.sm },
+  row: { flexDirection: 'row', gap: spacing.sm, height: ROW_STRIDE - spacing.sm },
   card: { alignItems: 'center', flex: 1, flexDirection: 'row', minHeight: 76, padding: spacing.sm },
   channelText: { flex: 1, marginLeft: spacing.md },
   channelName: { color: colors.text, fontSize: 18, fontWeight: '700' },

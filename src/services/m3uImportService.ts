@@ -1,4 +1,5 @@
 import { File } from 'expo-file-system';
+import { fetch } from 'expo/fetch';
 
 import {
   markPlaylistSyncFailed,
@@ -17,9 +18,10 @@ import {
 import { parseM3u, type M3uParseResult } from './m3uParser';
 import { fingerprintLocalContent, fingerprintRemoteEndpoint } from './sourceIdentity';
 import { importXmltv } from './epgService';
+import { readResponseTextProgressively } from './progressiveText';
 
 const MAX_PLAYLIST_BYTES = 25 * 1024 * 1024;
-const DOWNLOAD_TIMEOUT_MS = 20_000;
+const DOWNLOAD_TIMEOUT_MS = 60_000;
 
 export type M3uImportReport = M3uParseResult & { playlistId: string };
 
@@ -69,13 +71,13 @@ async function downloadM3u(
     }
     return {
       kind: 'content' as const,
-      content: await response.text(),
+      content: await readResponseTextProgressively(response, MAX_PLAYLIST_BYTES),
       httpValidators,
     };
   } catch (error) {
     if (externalSignal?.aborted) throw new Error('Import annulé.');
     if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error('Le téléchargement a dépassé 20 secondes.');
+      throw new Error('Le téléchargement a dépassé 60 secondes.');
     }
     throw error;
   } finally {
