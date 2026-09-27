@@ -149,6 +149,27 @@ du propriétaire de l'application.
 Le prochain chantier implémentable est désormais le point 2 de la liste de
 reprise, **Synchronisation Xtream complète**.
 
+### Avancement synchronisation Xtream — 27 septembre 2026
+
+- Implémenté : bouton Actualiser actif pour les sources Xtream existantes et
+  récupération des identifiants exclusivement depuis SecureStore.
+- Implémenté : upsert transactionnel des catégories, chaînes, films et séries,
+  avec détection des ajouts, modifications, suppressions et éléments inchangés.
+- Implémenté : resynchronisation des épisodes des séries déjà consultées ; les
+  séries jamais ouvertes continuent à charger leurs épisodes à la demande afin
+  d'éviter des milliers de requêtes et le blocage du fournisseur.
+- Préservé : favoris, dernières chaînes regardées et progressions grâce aux
+  identifiants stables des chaînes, films, séries et épisodes.
+- Sécurisé : préparation complète avant mutation, rollback SQLite en cas d'erreur,
+  conservation du dernier catalogue valide et rapport agrégé sans URL ni
+  identifiants.
+- Validé automatiquement : calcul des rapports Xtream, TypeScript et ESLint.
+- À confirmer sur source réelle : suppressions et modifications massives ainsi
+  que le comportement d'un fournisseur qui coupe la connexion pendant la synchro.
+
+Le prochain chantier implémentable est désormais le point 3 de la liste de
+reprise, **Catalogue et imports volumineux**.
+
 1. **Fiabiliser le lecteur Live**
    - enregistrer la chaîne en cours et relancer automatiquement la lecture après
      une interruption réseau récupérable ;

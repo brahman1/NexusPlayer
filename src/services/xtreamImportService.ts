@@ -1,10 +1,11 @@
 import { storeXtreamCatalog } from '../repositories/XtreamImportRepository';
+import { syncXtreamCatalog } from '../repositories/XtreamSyncRepository';
 import { Platform } from 'react-native';
 import { deleteCredentials, loadCredentials, saveCredentials } from '../storage/credentialVault';
 import { getDatabase } from '../storage/database';
 import { createId, stableId } from '../utils/ids';
 import { fetchXtreamCatalog, fetchXtreamSeriesEpisodes, normalizeXtreamServer, xtreamMediaUrl } from './xtreamClient';
-import type { Channel, XtreamCredentials } from '../types/domain';
+import type { Channel, Playlist, XtreamCredentials } from '../types/domain';
 
 export async function importXtream(name: string, serverUrl: string, credentials: XtreamCredentials) {
   const endpoint = normalizeXtreamServer(serverUrl);
@@ -14,6 +15,31 @@ export async function importXtream(name: string, serverUrl: string, credentials:
   try { await saveCredentials(playlistId, credentials); }
   catch (error) { await getDatabase().then((db) => db.runAsync('DELETE FROM playlists WHERE id = ?', playlistId)); throw error; }
   return { playlistId, ...counts };
+}
+
+export async function refreshXtreamPlaylist(playlist: Playlist) {
+  if (playlist.sourceKind !== 'xtream' || !playlist.endpoint) throw new Error('Cette source Xtream ne peut pas être actualisée.');
+  const credentials = await loadCredentials(playlist.id);
+  if (!credentials || !('username' in credentials)) throw new Error('Identifiants Xtream indisponibles sur cet appareil.');
+  const database = await getDatabase();
+  await database.runAsync(`UPDATE playlists SET sync_status = 'syncing', last_error = NULL WHERE id = ?`, playlist.id);
+  try {
+    const catalog = await fetchXtreamCatalog(playlist.endpoint, credentials);
+    const cachedSeries = await database.getAllAsync<{ id: string; external_id: string | null }>(
+      `SELECT DISTINCT s.id, s.external_id FROM series s JOIN episodes ep ON ep.series_id = s.id WHERE s.playlist_id = ?`,
+      playlist.id,
+    );
+    const incomingSeriesIds = new Set(catalog.series.map((item) => stableId('series', `${playlist.id}:${item.series_id}`)));
+    const episodeCatalogs = new Map<string, Awaited<ReturnType<typeof fetchXtreamSeriesEpisodes>>>();
+    for (const item of cachedSeries) {
+      if (!item.external_id || !incomingSeriesIds.has(item.id)) continue;
+      episodeCatalogs.set(item.id, await fetchXtreamSeriesEpisodes(playlist.endpoint, credentials, item.external_id));
+    }
+    return await syncXtreamCatalog(playlist.id, catalog, episodeCatalogs);
+  } catch (error) {
+    await database.runAsync(`UPDATE playlists SET sync_status = 'error', last_error = ? WHERE id = ?`, 'Synchronisation Xtream impossible. Le dernier catalogue valide a été conservé.', playlist.id);
+    throw error;
+  }
 }
 
 export async function resolveXtreamChannel(channel: Channel) {

@@ -20,7 +20,8 @@ import { refreshM3uPlaylist } from '../services/m3uImportService';
 import { colors, radii, spacing } from '../theme/tokens';
 import type { Playlist } from '../types/domain';
 import { endpointForDisplay } from '../utils/endpoint';
-import { removeXtreamCredentials } from '../services/xtreamImportService';
+import { refreshXtreamPlaylist, removeXtreamCredentials } from '../services/xtreamImportService';
+import { sumXtreamSyncReport } from '../services/xtreamSync';
 
 const repository = new SQLitePlaylistRepository();
 
@@ -86,6 +87,12 @@ export function LibraryScreen() {
     setError(null);
     setNotice(`Actualisation de « ${playlist.name} »…`);
     try {
+      if (playlist.sourceKind === 'xtream') {
+        const report = sumXtreamSyncReport(await refreshXtreamPlaylist(playlist));
+        setNotice(`Xtream synchronisé : +${report.added}, ${report.modified} modifiés, ${report.removed} supprimés, ${report.unchanged} inchangés.`);
+        await load();
+        return;
+      }
       const report = await refreshM3uPlaylist(playlist);
       setNotice(report.notModified
         ? `« ${playlist.name} » est déjà à jour (${report.total} chaînes).`
@@ -173,7 +180,7 @@ export function LibraryScreen() {
           <Text style={styles.endpoint}>{endpointForDisplay(managing?.endpoint ?? null)}</Text>
           <View style={styles.actions}>
             <PrimaryButton label="Renommer" onPress={() => managing && openRename(managing)} />
-            <PrimaryButton disabled={managing?.sourceKind !== 'm3u-url'} label="Actualiser" onPress={() => { const item = managing; setManaging(null); if (item) void refresh(item); }} />
+            <PrimaryButton disabled={managing?.sourceKind !== 'm3u-url' && managing?.sourceKind !== 'xtream'} label="Actualiser" onPress={() => { const item = managing; setManaging(null); if (item) void refresh(item); }} />
             <PrimaryButton label="Diagnostiquer" onPress={() => { if (managing) setNotice(`${managing.sourceKind.toUpperCase()} · ${managing.channelCount} chaînes · dernière synchronisation ${managing.lastSyncedAt ? new Date(managing.lastSyncedAt).toLocaleString() : 'inconnue'}. Adresse et identifiants masqués.`); setManaging(null); }} />
             <PrimaryButton label="Supprimer" onPress={() => { const item = managing; setManaging(null); if (item) requestDelete(item); }} />
             <PrimaryButton label="Fermer" onPress={() => setManaging(null)} />
