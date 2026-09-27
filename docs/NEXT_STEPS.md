@@ -70,6 +70,26 @@ TV `dist-tv-resume` réussis.
 Ne pas reprendre les fonctions VOD déjà terminées. Continuer directement dans
 l'ordre suivant :
 
+### Avancement lecteur Live — 27 septembre 2026
+
+- Implémenté : mémorisation de la dernière chaîne lue, reconnexion automatique
+  annulable (1, 2, 4 puis 8 secondes), arrêt des tentatives sur les erreurs
+  permanentes et conservation du catalogue pendant les pannes.
+- Implémenté : résolution et préchargement en mémoire des chaînes précédente et
+  suivante, réutilisation immédiate de la chaîne déjà résolue au zapping et aucun
+  affichage ni journalisation des URL sensibles.
+- Implémenté : pistes audio, sous-titres activables/désactivables, variantes HLS
+  disponibles, format Ajuster/Remplir/Étirer persistant, diagnostic sans URL,
+  plein écran et Picture-in-Picture lorsque la plateforme le permet.
+- Validé automatiquement : politique de reconnexion, TypeScript et ESLint.
+- À confirmer sur appareils physiques dans le lot 7 : absence de flash noir au
+  zapping, commandes D-pad, comportement PiP/plein écran et reprise après mise en
+  arrière-plan sur Android, iOS, Android TV et tvOS.
+
+Le prochain chantier implémentable est désormais le point 4, **Compléter le
+Guide EPG**. Les validations physiques restantes des points 1 à 3 sont regroupées
+au point 7 et ne doivent pas bloquer le développement du Guide.
+
 1. **Fiabiliser le lecteur Live**
    - enregistrer la chaîne en cours et relancer automatiquement la lecture après
      une interruption réseau récupérable ;
