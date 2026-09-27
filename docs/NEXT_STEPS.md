@@ -258,6 +258,21 @@ Apple TV.
 - À confirmer sur l'iPhone réel : seek court et seek de plus d'une heure sur un
   film et un épisode provenant du fournisseur utilisé pour le test.
 
+### Deuxième passe lecteur VOD iPhone — 28 septembre 2026
+
+- Optimisé : seek VLC par position relative, option de recherche rapide et cache
+  VOD ramené à une seconde pour réduire l'attente après un déplacement.
+- Corrigé : en plein écran, les commandes disparaissent automatiquement après
+  3,5 secondes ; toucher l'image les affiche ou les masque sans quitter la vidéo.
+- Corrigé : nettoyage des pistes audio/sous-titres dupliquées, réapplication de la
+  piste choisie et confirmation visible du choix.
+- Clarifié : si le fournisseur n'intègre aucune piste dans la vidéo, le panneau
+  indique désormais explicitement « Aucun sous-titre intégré détecté ».
+- Validé automatiquement : TypeScript, ESLint, 21 suites / 66 tests, bundle iOS
+  mobile et bundle Android TV.
+- À confirmer sur source réelle : rapidité du seek dépend encore de l'indexation
+  du fichier et du serveur ; tester plusieurs films et épisodes du fournisseur.
+
 1. **Fiabiliser le lecteur Live**
    - enregistrer la chaîne en cours et relancer automatiquement la lecture après
      une interruption réseau récupérable ;

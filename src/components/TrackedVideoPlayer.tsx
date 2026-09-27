@@ -11,6 +11,7 @@ import { describePlaybackError } from '../services/playbackError';
 import { colors, radii, spacing } from '../theme/tokens';
 
 const progressRepository = new WatchProgressRepository();
+const VOD_PLAYER_OPTIONS = ['--network-caching=1000', '--input-fast-seek', '--http-reconnect'];
 
 type Props = {
   mediaId: string;
@@ -24,6 +25,10 @@ type Props = {
 
 type TrackPanel = 'audio' | 'subtitle' | null;
 
+function playableTracks(items: MediaTrack[]) {
+  return items.filter((item, index) => item.id >= 0 && items.findIndex((candidate) => candidate.id === item.id) === index);
+}
+
 export function TrackedVideoPlayer({ mediaId, mediaKind, name, onEnded, onFullscreenChange, resumeSeconds, uri }: Props) {
   const { width } = useWindowDimensions();
   const compact = !Platform.isTV && width < 600;
@@ -35,6 +40,7 @@ export function TrackedVideoPlayer({ mediaId, mediaKind, name, onEnded, onFullsc
   const lastSavedAt = useRef(resumeSeconds);
   const queue = useRef<Promise<unknown>>(Promise.resolve());
   const bufferingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const controlsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [duration, setDuration] = useState(0);
   const [position, setPosition] = useState(resumeSeconds);
   const [scrubPosition, setScrubPosition] = useState(resumeSeconds);
@@ -50,6 +56,7 @@ export function TrackedVideoPlayer({ mediaId, mediaKind, name, onEnded, onFullsc
   const [audioTracks, setAudioTracks] = useState<MediaTrack[]>([]);
   const [subtitleTracks, setSubtitleTracks] = useState<MediaTrack[]>([]);
   const [tracks, setTracks] = useState<Tracks>({ subtitle: -1 });
+  const [controlsVisible, setControlsVisible] = useState(true);
   const playbackError = error ? describePlaybackError(error) : null;
 
   const enqueueSave = useCallback((force = false) => {
@@ -81,6 +88,17 @@ export function TrackedVideoPlayer({ mediaId, mediaKind, name, onEnded, onFullsc
     bufferingTimer.current = setTimeout(() => setBuffering(true), 650);
   }, []);
 
+  const clearControlsTimer = useCallback(() => {
+    if (controlsTimer.current) clearTimeout(controlsTimer.current);
+    controlsTimer.current = null;
+  }, []);
+
+  const revealControls = useCallback(() => {
+    clearControlsTimer();
+    setControlsVisible(true);
+    if (fullscreen) controlsTimer.current = setTimeout(() => setControlsVisible(false), 3500);
+  }, [clearControlsTimer, fullscreen]);
+
   const seekTo = useCallback(async (seconds: number) => {
     const target = Math.max(0, Math.min(latestDuration.current || Number.MAX_SAFE_INTEGER, seconds));
     latestPosition.current = target;
@@ -88,7 +106,9 @@ export function TrackedVideoPlayer({ mediaId, mediaKind, name, onEnded, onFullsc
     setScrubPosition(target);
     setBuffering(true);
     try {
-      await playerRef.current?.seek(Math.round(target * 1000), 'time');
+      const mediaDuration = latestDuration.current;
+      if (mediaDuration > 0) await playerRef.current?.seek(Math.max(0, Math.min(1, target / mediaDuration)), 'position');
+      else await playerRef.current?.seek(Math.round(target * 1000), 'time');
       if (playing) await playerRef.current?.play();
     } catch {
       setBuffering(false);
@@ -111,6 +131,9 @@ export function TrackedVideoPlayer({ mediaId, mediaKind, name, onEnded, onFullsc
 
   const toggleFullscreen = useCallback(async () => {
     const next = !fullscreen;
+    clearControlsTimer();
+    setControlsVisible(true);
+    if (next) controlsTimer.current = setTimeout(() => setControlsVisible(false), 3500);
     setFullscreen(next);
     setTrackPanel(null);
     onFullscreenChange?.(next);
@@ -122,7 +145,7 @@ export function TrackedVideoPlayer({ mediaId, mediaKind, name, onEnded, onFullsc
         setNotice('La rotation automatique est indisponible sur cet appareil.');
       }
     }
-  }, [fullscreen, onFullscreenChange]);
+  }, [clearControlsTimer, fullscreen, onFullscreenChange]);
 
   const startPictureInPicture = useCallback(async (silent = false) => {
     try {
@@ -146,9 +169,24 @@ export function TrackedVideoPlayer({ mediaId, mediaKind, name, onEnded, onFullsc
 
   useEffect(() => () => {
     clearBufferingTimer();
+    clearControlsTimer();
     onFullscreenChange?.(false);
     if (!Platform.isTV) void ScreenOrientation.unlockAsync();
-  }, [clearBufferingTimer, onFullscreenChange]);
+  }, [clearBufferingTimer, clearControlsTimer, onFullscreenChange]);
+
+  const selectAudioTrack = useCallback((id: number) => {
+    setTracks((current) => ({ ...current, audio: id }));
+    const selected = audioTracks.find((track) => track.id === id);
+    setNotice(selected ? `Langue audio : ${selected.name}` : null);
+    if (playing) setTimeout(() => { void playerRef.current?.play(); }, 50);
+  }, [audioTracks, playing]);
+
+  const selectSubtitleTrack = useCallback((id: number) => {
+    setTracks((current) => ({ ...current, subtitle: id }));
+    const selected = subtitleTracks.find((track) => track.id === id);
+    setNotice(id === -1 ? 'Sous-titres désactivés.' : selected ? `Sous-titres : ${selected.name}` : 'Piste de sous-titres sélectionnée.');
+    if (playing) setTimeout(() => { void playerRef.current?.play(); }, 50);
+  }, [playing, subtitleTracks]);
 
   const displayedPosition = seeking ? scrubPosition : position;
 
@@ -174,8 +212,8 @@ export function TrackedVideoPlayer({ mediaId, mediaKind, name, onEnded, onFullsc
           setError(message);
         }}
         onESAdded={({ audio, subtitle }) => {
-          setAudioTracks(audio);
-          setSubtitleTracks(subtitle);
+          setAudioTracks(playableTracks(audio));
+          setSubtitleTracks(playableTracks(subtitle));
         }}
         onFirstPlay={({ media }) => {
           clearBufferingTimer();
@@ -213,18 +251,19 @@ export function TrackedVideoPlayer({ mediaId, mediaKind, name, onEnded, onFullsc
           }
           enqueueSave();
         }}
-        options={['--network-caching=1500', '--http-reconnect']}
+        options={VOD_PLAYER_OPTIONS}
         pictureInPicture
         source={uri}
         style={styles.video}
         time={resumeSeconds >= 10 ? Math.round(resumeSeconds * 1000) : 0}
         tracks={tracks}
       />
+      {fullscreen && <Pressable accessibilityLabel={controlsVisible ? 'Masquer les commandes' : 'Afficher les commandes'} accessibilityRole="button" onPress={() => { if (controlsVisible) { clearControlsTimer(); setControlsVisible(false); } else revealControls(); }} style={styles.fullscreenTouchLayer} />}
       {buffering && !playbackError && <ActivityIndicator color={colors.accentStrong} size="large" style={styles.loading} />}
       {playbackError && <View accessibilityRole="alert" style={styles.errorPanel}><Text style={styles.errorTitle}>{playbackError.title}</Text><Text style={styles.errorDetail}>{playbackError.detail}</Text></View>}
     </View>
 
-    <View style={[styles.controlPanel, fullscreen && styles.controlPanelFullscreen]}>
+    {(!fullscreen || controlsVisible) && <View onTouchStart={revealControls} style={[styles.controlPanel, fullscreen && styles.controlPanelFullscreen]}>
       <View style={styles.timeline}>
         <Slider
           accessibilityLabel="Position de lecture"
@@ -257,12 +296,12 @@ export function TrackedVideoPlayer({ mediaId, mediaKind, name, onEnded, onFullsc
         <ControlButton compact={compact} icon={fullscreen ? 'contract' : 'expand'} label={fullscreen ? 'Quitter le plein écran' : 'Plein écran'} onPress={() => void toggleFullscreen()} style={compact && styles.secondaryButtonCompact} />
       </View>
 
-      {trackPanel === 'audio' && <TrackSelector emptyLabel="Aucune autre piste audio détectée" label="Langue audio" onSelect={(id) => setTracks((current) => ({ ...current, audio: id }))} selectedId={tracks.audio} tracks={audioTracks} />}
-      {trackPanel === 'subtitle' && <TrackSelector allowDisabled emptyLabel="Aucun sous-titre détecté" label="Sous-titres" onSelect={(id) => setTracks((current) => ({ ...current, subtitle: id }))} selectedId={tracks.subtitle} tracks={subtitleTracks} />}
+      {trackPanel === 'audio' && <TrackSelector emptyLabel="Aucune autre piste audio détectée" label="Langue audio" onSelect={selectAudioTrack} selectedId={tracks.audio} tracks={audioTracks} />}
+      {trackPanel === 'subtitle' && <TrackSelector allowDisabled emptyLabel="Aucun sous-titre intégré détecté dans cette vidéo" label="Sous-titres" onSelect={selectSubtitleTrack} selectedId={tracks.subtitle} tracks={subtitleTracks} />}
       {notice && <Text accessibilityRole="alert" style={styles.notice}>{notice}</Text>}
       {!fullscreen && <Text numberOfLines={2} style={styles.title}>{name}</Text>}
       {!fullscreen && resumeSeconds >= 10 && <Text style={styles.resume}>Reprise à {formatTime(resumeSeconds)}</Text>}
-    </View>
+    </View>}
   </View>;
 }
 
@@ -304,8 +343,9 @@ const styles = StyleSheet.create({
   playerFrameFullscreen: { aspectRatio: undefined, flex: 1 },
   video: { flex: 1 },
   loading: { alignSelf: 'center', bottom: 0, left: 0, position: 'absolute', right: 0, top: 0 },
+  fullscreenTouchLayer: { bottom: 0, left: 0, position: 'absolute', right: 0, top: 0, zIndex: 1 },
   controlPanel: { width: '100%' },
-  controlPanelFullscreen: { backgroundColor: 'rgba(3, 6, 13, 0.82)', bottom: 0, left: 0, padding: spacing.md, position: 'absolute', right: 0 },
+  controlPanelFullscreen: { backgroundColor: 'rgba(3, 6, 13, 0.82)', bottom: 0, left: 0, padding: spacing.md, position: 'absolute', right: 0, zIndex: 2 },
   timeline: { marginTop: spacing.sm },
   slider: { height: 38, width: '100%' },
   timeRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: -spacing.xs },
