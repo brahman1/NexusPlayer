@@ -37,12 +37,12 @@ export class EpgRepository {
     return database.getAllAsync<GuideProgramme>(
       `SELECT DISTINCT ep.id, ep.playlist_id AS playlistId, ep.channel_tvg_id AS channelTvgId,
               ep.title, ep.description, ep.starts_at AS startsAt, ep.ends_at AS endsAt,
-              ch.id AS channelId, ch.name AS channelName, ch.logo_url AS logoUrl
+              ch.id AS channelId, ch.display_name AS channelName, ch.logo_url AS logoUrl
        FROM epg_programmes ep JOIN channels ch
          ON ch.playlist_id = ep.playlist_id
         AND (ch.tvg_id = ep.channel_tvg_id OR ch.tvg_name = ep.channel_tvg_id OR ch.name = ep.channel_tvg_id)
        WHERE ep.starts_at < ? AND ep.ends_at > ?
-       ORDER BY ch.name COLLATE NOCASE, ep.starts_at
+       ORDER BY ch.sort_name COLLATE NOCASE, ep.starts_at
        LIMIT ?`,
       windowEnd.toISOString(), windowStart.toISOString(), Math.min(Math.max(limit, 1), 10_000),
     );

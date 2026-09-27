@@ -21,6 +21,7 @@ export interface Category {
   id: string;
   playlistId: string;
   name: string;
+  displayName: string;
   kind: 'live' | 'movie' | 'series';
   position: number;
 }
@@ -30,6 +31,7 @@ export interface Channel {
   playlistId: string;
   categoryId: string | null;
   name: string;
+  displayName: string;
   streamUrl: string;
   tvgId: string | null;
   tvgName: string | null;

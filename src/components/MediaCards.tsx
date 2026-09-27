@@ -7,7 +7,7 @@ import type { Channel } from '../types/domain';
 
 export function ChannelTile({ channel, autoFocus = false, onPress }: { channel: Channel; autoFocus?: boolean; onPress: () => void }) {
   const [failed, setFailed] = useState(false);
-  return <FocusableCard autoFocus={autoFocus} onPress={onPress} style={styles.channel}><View style={styles.logo}>{channel.logoUrl && !failed ? <Image onError={() => setFailed(true)} resizeMode="contain" source={{ uri: channel.logoUrl }} style={styles.logoImage} /> : <Text style={styles.letter}>{channel.name.slice(0, 1).toUpperCase()}</Text>}</View><Text numberOfLines={1} style={styles.channelName}>{channel.name}</Text><View style={styles.liveRow}><View style={styles.liveDot} /><Text style={styles.meta}>EN DIRECT</Text></View></FocusableCard>;
+  return <FocusableCard autoFocus={autoFocus} onPress={onPress} style={styles.channel}><View style={styles.logo}>{channel.logoUrl && !failed ? <Image onError={() => setFailed(true)} resizeMode="contain" source={{ uri: channel.logoUrl }} style={styles.logoImage} /> : <Text style={styles.letter}>{channel.displayName.slice(0, 1).toUpperCase()}</Text>}</View><Text numberOfLines={1} style={styles.channelName}>{channel.displayName}</Text><View style={styles.liveRow}><View style={styles.liveDot} /><Text style={styles.meta}>EN DIRECT</Text></View></FocusableCard>;
 }
 
 export function MediaPoster({ title, imageUrl, meta, onPress, progress, width = 176 }: { title: string; imageUrl: string | null; meta?: string | null; onPress?: () => void; progress?: number; width?: number }) {

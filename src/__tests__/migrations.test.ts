@@ -1,4 +1,4 @@
-import { DATABASE_VERSION, migrationV1, migrationV2, migrationV3 } from '../storage/migrations';
+import { DATABASE_VERSION, migrationV1, migrationV2, migrationV3, migrationV6 } from '../storage/migrations';
 
 describe('schéma de données', () => {
   it('conserve les secrets hors de SQLite', () => {
@@ -10,7 +10,13 @@ describe('schéma de données', () => {
   it('indexe les recherches Live et EPG', () => {
     expect(migrationV1).toContain('idx_channels_playlist');
     expect(migrationV1).toContain('idx_epg_now_next');
-    expect(DATABASE_VERSION).toBe(5);
+    expect(DATABASE_VERSION).toBe(6);
+  });
+
+  it('indexe les noms de présentation sans remplacer les noms fournisseur', () => {
+    expect(migrationV6).toContain('display_name');
+    expect(migrationV6).toContain('sort_name');
+    expect(migrationV6).toContain('idx_channels_display_sort');
   });
 
   it('ne change pas le journal SQLite dans la transaction de migration', () => {

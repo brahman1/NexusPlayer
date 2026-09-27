@@ -269,7 +269,7 @@ export function PlayerScreen() {
         {channel && overlay && (
           <View style={[styles.details, compact && styles.detailsCompact]}>
             <View style={styles.channelDetails}>
-              <Text numberOfLines={1} style={styles.title}>{channel.name}</Text>
+              <Text numberOfLines={1} style={styles.title}>{channel.displayName}</Text>
               {programmes[0] && <Text numberOfLines={1} style={styles.now}>Maintenant · {programmes[0].title}</Text>}
               {programmes[1] && <Text numberOfLines={1} style={styles.next}>Ensuite · {programmes[1].title}</Text>}
               {Platform.isTV && <Text style={styles.hint}>D-pad haut/bas : changer de chaîne</Text>}

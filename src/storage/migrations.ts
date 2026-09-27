@@ -1,4 +1,4 @@
-export const DATABASE_VERSION = 5;
+export const DATABASE_VERSION = 6;
 
 export const migrationV1 = `
   CREATE TABLE IF NOT EXISTS playlists (
@@ -141,4 +141,15 @@ export const migrationV5 = `
   ALTER TABLE movies ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0;
   ALTER TABLE series ADD COLUMN external_id TEXT;
   ALTER TABLE series ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0;
+`;
+
+export const migrationV6 = `
+  ALTER TABLE categories ADD COLUMN display_name TEXT NOT NULL DEFAULT '';
+  ALTER TABLE categories ADD COLUMN sort_name TEXT NOT NULL DEFAULT '';
+  ALTER TABLE channels ADD COLUMN display_name TEXT NOT NULL DEFAULT '';
+  ALTER TABLE channels ADD COLUMN sort_name TEXT NOT NULL DEFAULT '';
+  CREATE INDEX IF NOT EXISTS idx_categories_display_sort
+    ON categories(playlist_id, kind, sort_name COLLATE NOCASE);
+  CREATE INDEX IF NOT EXISTS idx_channels_display_sort
+    ON channels(playlist_id, category_id, sort_name COLLATE NOCASE);
 `;

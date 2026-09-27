@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 
 import { FocusableCard } from '../components/FocusableCard';
@@ -28,7 +28,7 @@ function FilterButton({ active, label, onPress }: { active: boolean; label: stri
 function ChannelLogo({ channel }: { channel: Channel }) {
   const [failed, setFailed] = useState(false);
   if (!channel.logoUrl || failed) {
-    return <View style={styles.logoFallback}><Text style={styles.logoLetter}>{channel.name.slice(0, 1).toUpperCase()}</Text></View>;
+    return <View style={styles.logoFallback}><Text style={styles.logoLetter}>{channel.displayName.slice(0, 1).toUpperCase()}</Text></View>;
   }
   return <Image onError={() => setFailed(true)} resizeMode="contain" source={{ uri: channel.logoUrl }} style={styles.logo} />;
 }
@@ -55,13 +55,15 @@ export function ChannelListScreen() {
   const loadingMoreRef = useRef(false);
   const listRef = useRef<FlatList<Channel>>(null);
   const lastFocusedId = id ? preferences.getLastFocusedChannel(id) : null;
+  const selectedCategoryIds = useMemo(() => categories.find((category) => category.id === filter)?.categoryIds, [categories, filter]);
+  const categoryNamesById = useMemo(() => new Map(categories.flatMap((category) => category.categoryIds.map((categoryId) => [categoryId, category.displayName] as const))), [categories]);
 
   const loadChannels = useCallback(async () => {
     if (!id) return;
     const version = ++requestVersion.current;
     const filters = {
       search,
-      categoryId: !['all', 'favorites', 'recent'].includes(filter) ? filter : null,
+      categoryIds: selectedCategoryIds,
       favoritesOnly: filter === 'favorites',
       recentOnly: filter === 'recent',
     };
@@ -86,7 +88,7 @@ export function ChannelListScreen() {
     } finally {
       if (version === requestVersion.current) setLoading(false);
     }
-  }, [filter, id, search]);
+  }, [filter, id, search, selectedCategoryIds]);
 
   const loadMore = useCallback(async () => {
     if (!id || loading || loadingMoreRef.current || channels.length >= totalCount) return;
@@ -96,7 +98,7 @@ export function ChannelListScreen() {
     try {
       const nextPage = await repository.listByPlaylist(id, {
         search,
-        categoryId: !['all', 'favorites', 'recent'].includes(filter) ? filter : null,
+        categoryIds: selectedCategoryIds,
         favoritesOnly: filter === 'favorites',
         recentOnly: filter === 'recent',
         limit: PAGE_SIZE,
@@ -113,7 +115,7 @@ export function ChannelListScreen() {
       loadingMoreRef.current = false;
       if (version === requestVersion.current) setLoadingMore(false);
     }
-  }, [channels.length, filter, id, loadedOffset, loading, search, totalCount]);
+  }, [channels.length, filter, id, loadedOffset, loading, search, selectedCategoryIds, totalCount]);
 
   const loadPrevious = useCallback(async () => {
     if (!id || loading || loadingMoreRef.current || loadedOffset <= 0) return;
@@ -198,7 +200,7 @@ export function ChannelListScreen() {
             <FilterButton
               active={filter === category.id}
               key={category.id}
-              label={`${category.name} (${category.channelCount})`}
+              label={`${category.displayName} (${category.channelCount})`}
               onPress={() => setFilter(category.id)}
             />
           ))}
@@ -232,8 +234,8 @@ export function ChannelListScreen() {
                 >
                   <ChannelLogo channel={item} />
                   <View style={styles.channelText}>
-                    <Text numberOfLines={1} style={styles.channelName}>{item.name}</Text>
-                    <Text numberOfLines={1} style={styles.meta}>{item.tvgName || item.language || 'Live'}</Text>
+                    <Text numberOfLines={1} style={styles.channelName}>{item.displayName}</Text>
+                    <Text numberOfLines={1} style={styles.meta}>{[item.categoryId ? categoryNamesById.get(item.categoryId) : null, item.country, item.language].filter(Boolean).join(' · ') || 'En direct'}</Text>
                   </View>
                 </FocusableCard>
                 <FocusableCard
@@ -251,7 +253,7 @@ export function ChannelListScreen() {
           />
           {showPreview && focusedChannel && <View style={styles.preview}>
             <ChannelLogo channel={focusedChannel} />
-            <Text numberOfLines={2} style={styles.previewTitle}>{focusedChannel.name}</Text>
+            <Text numberOfLines={2} style={styles.previewTitle}>{focusedChannel.displayName}</Text>
             <Text style={styles.liveBadge}>● EN DIRECT</Text>
             {programmes[0] ? <><Text style={styles.epgLabel}>MAINTENANT</Text><Text numberOfLines={2} style={styles.epgTitle}>{programmes[0].title}</Text></> : <Text style={styles.previewMeta}>Aucune donnée EPG disponible.</Text>}
             {programmes[1] && <><Text style={styles.epgLabel}>ENSUITE</Text><Text numberOfLines={2} style={styles.previewMeta}>{programmes[1].title}</Text></>}

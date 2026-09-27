@@ -203,6 +203,25 @@ reprise, **Synchronisation Xtream complète**.
 - À confirmer sur le nouvel exécutable iPhone : démarrage automatique du PiP,
   rotation plein écran et sélection des pistes sur plusieurs conteneurs vidéo.
 
+### Organisation du catalogue Live — 27 septembre 2026
+
+- Corrigé : le Live n'affiche plus les catégories films/séries Xtream ni les
+  catégories ne contenant aucune chaîne.
+- Implémenté : conservation du nom fournisseur brut pour l'EPG et ajout séparé
+  d'un nom d'affichage nettoyé pour ne pas casser les associations techniques.
+- Implémenté : retrait des préfixes décoratifs et techniques courants, espaces et
+  séparateurs incohérents, avec noms de pays explicites dans les catégories.
+- Implémenté : tri naturel des chaînes (`France 2` avant `France 10`) et ordre
+  fonctionnel des catégories : généralistes, information, sport, cinéma,
+  jeunesse, documentaires, musique, locales puis autres.
+- Implémenté : regroupement des catégories ayant le même nom nettoyé et affichage
+  de la catégorie lisible sous chaque chaîne.
+- La migration SQLite v6 recalcule automatiquement ces noms et tris pour les
+  sources déjà présentes, sans demander une nouvelle importation.
+- Validé : normalisation, ordre naturel, migration, import M3U, synchronisation
+  Xtream, TypeScript, ESLint, 21 suites / 66 tests, bundle iOS
+  `dist-ios-live-order` et bundle Android TV `dist-tv-live-order`.
+
 Le prochain chantier est désormais le point 4 de la liste de reprise,
 **Validation physique multiplateforme**. Il nécessite les appareils du
 propriétaire ; commencer par reconstruire l'application iPhone, puis valider ce

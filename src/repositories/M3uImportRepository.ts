@@ -3,6 +3,7 @@ import type { SourceKind } from '../types/domain';
 import { stableId } from '../utils/ids';
 import type { ParsedM3uChannel } from '../services/m3uParser';
 import type { HttpValidators } from '../services/httpValidators';
+import { categoryDisplayName, categorySortKey, channelDisplayName, naturalSortKey } from '../services/channelPresentation';
 import {
   createPlaylistSyncReport,
   type ExistingChannelSnapshot,
@@ -58,14 +59,14 @@ async function insertChannels(
 ) {
   const database = await getDatabase();
   const categoryStatement = await database.prepareAsync(
-    `INSERT INTO categories (id, playlist_id, name, kind, position)
-     VALUES (?, ?, ?, 'live', ?)`,
+    `INSERT INTO categories (id, playlist_id, name, display_name, sort_name, kind, position)
+     VALUES (?, ?, ?, ?, ?, 'live', ?)`,
   );
   const channelStatement = await database.prepareAsync(
     `INSERT INTO channels (
-      id, playlist_id, category_id, name, stream_url, tvg_id, tvg_name,
+      id, playlist_id, category_id, name, display_name, sort_name, stream_url, tvg_id, tvg_name,
       logo_url, language, country, is_favorite, last_watched_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   );
 
   try {
@@ -79,16 +80,21 @@ async function insertChannels(
           categoryId,
           playlistId,
           channel.groupTitle,
+          categoryDisplayName(channel.groupTitle),
+          categorySortKey(channel.groupTitle),
           categoryIds.size - 1,
         );
       }
 
       const previous = preserved.get(channel.streamUrl);
+      const displayName = channelDisplayName(channel.name);
       await channelStatement.executeAsync(
         stableId('channel', `${playlistId}:${channel.streamUrl}`),
         playlistId,
         categoryId,
         channel.name,
+        displayName,
+        naturalSortKey(displayName),
         channel.streamUrl,
         channel.tvgId,
         channel.tvgName,

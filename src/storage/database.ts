@@ -1,10 +1,32 @@
 import * as SQLite from 'expo-sqlite';
 
-import { DATABASE_VERSION, migrationV1, migrationV2, migrationV3, migrationV4, migrationV5 } from './migrations';
+import { categoryDisplayName, categorySortKey, channelDisplayName, naturalSortKey } from '../services/channelPresentation';
+import { DATABASE_VERSION, migrationV1, migrationV2, migrationV3, migrationV4, migrationV5, migrationV6 } from './migrations';
 
 const DATABASE_NAME = 'nexusplayer.db';
 
 let databasePromise: Promise<SQLite.SQLiteDatabase> | null = null;
+
+async function backfillPresentationNames(database: SQLite.SQLiteDatabase) {
+  const [categories, channels] = await Promise.all([
+    database.getAllAsync<{ id: string; name: string }>('SELECT id, name FROM categories'),
+    database.getAllAsync<{ id: string; name: string }>('SELECT id, name FROM channels'),
+  ]);
+  const categoryStatement = await database.prepareAsync('UPDATE categories SET display_name = ?, sort_name = ? WHERE id = ?');
+  const channelStatement = await database.prepareAsync('UPDATE channels SET display_name = ?, sort_name = ? WHERE id = ?');
+  try {
+    for (const category of categories) {
+      await categoryStatement.executeAsync(categoryDisplayName(category.name), categorySortKey(category.name), category.id);
+    }
+    for (const channel of channels) {
+      const displayName = channelDisplayName(channel.name);
+      await channelStatement.executeAsync(displayName, naturalSortKey(displayName), channel.id);
+    }
+  } finally {
+    await categoryStatement.finalizeAsync();
+    await channelStatement.finalizeAsync();
+  }
+}
 
 async function migrate(database: SQLite.SQLiteDatabase) {
   const row = await database.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
@@ -48,6 +70,14 @@ async function migrate(database: SQLite.SQLiteDatabase) {
     await database.withTransactionAsync(async () => {
       await database.execAsync(migrationV5);
       await database.execAsync('PRAGMA user_version = 5');
+    });
+  }
+
+  if (currentVersion < 6) {
+    await database.withTransactionAsync(async () => {
+      await database.execAsync(migrationV6);
+      await backfillPresentationNames(database);
+      await database.execAsync('PRAGMA user_version = 6');
     });
   }
 }
