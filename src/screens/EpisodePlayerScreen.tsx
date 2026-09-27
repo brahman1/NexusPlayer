@@ -1,4 +1,4 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { ActionButton, Panel } from '../components/NexusUI';
@@ -12,7 +12,7 @@ import { colors, spacing } from '../theme/tokens';
 const discovery = new DiscoveryRepository();
 const progressRepository = new WatchProgressRepository();
 
-type EpisodeMedia = { id: string; name: string; next: { id: string; name: string } | null; resumeSeconds: number; uri: string };
+type EpisodeMedia = { headerTitle: string; id: string; name: string; next: { id: string; name: string } | null; resumeSeconds: number; uri: string };
 
 export function EpisodePlayerScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -21,6 +21,7 @@ export function EpisodePlayerScreen() {
   const [error, setError] = useState<string | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [finished, setFinished] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -30,7 +31,7 @@ export function EpisodePlayerScreen() {
         setError(null);
         setCountdown(null);
         setFinished(false);
-        setMedia({ id: episode.id, name: episode.name, next, resumeSeconds: progress?.positionSeconds ?? 0, uri: await resolveXtreamMedia(episode.playlist_id, episode.stream_url) });
+        setMedia({ headerTitle: `${episode.series_name} · S${episode.season_number} E${episode.episode_number}`, id: episode.id, name: episode.name, next, resumeSeconds: progress?.positionSeconds ?? 0, uri: await resolveXtreamMedia(episode.playlist_id, episode.stream_url) });
       })
       .catch((caught) => setError(caught instanceof Error ? caught.message : 'Lecture impossible.'));
   }, [id]);
@@ -51,8 +52,9 @@ export function EpisodePlayerScreen() {
   };
   const playNext = () => media?.next && router.replace({ pathname: '/watch/episode/[id]', params: { id: media.next.id } });
 
-  return <Screen><View style={styles.screen}>
-    {media?.id === id ? <TrackedVideoPlayer key={media.id} mediaId={media.id} mediaKind="episode" name={media.name} onEnded={onEnded} resumeSeconds={media.resumeSeconds} uri={media.uri} /> : error ? <Text style={styles.error}>{error}</Text> : <ActivityIndicator color={colors.accentStrong} size="large" />}
+  return <Screen fullscreen={fullscreen}><View style={styles.screen}>
+    <Stack.Screen options={{ headerShown: !fullscreen, title: media?.headerTitle ?? 'Épisode' }} />
+    {media?.id === id ? <TrackedVideoPlayer key={media.id} mediaId={media.id} mediaKind="episode" name={media.name} onEnded={onEnded} onFullscreenChange={setFullscreen} resumeSeconds={media.resumeSeconds} uri={media.uri} /> : error ? <Text style={styles.error}>{error}</Text> : <ActivityIndicator color={colors.accentStrong} size="large" />}
     {finished && media?.id === id && <Panel style={styles.nextPanel}>{media.next ? <><Text style={styles.nextTitle}>Épisode suivant dans {countdown ?? 0} s</Text><Text style={styles.nextName}>{media.next.name}</Text><View style={styles.actions}><ActionButton autoFocus icon="play" label="Lire maintenant" onPress={playNext} /><ActionButton icon="close" label="Annuler" onPress={() => { setCountdown(null); setFinished(false); }} variant="secondary" /></View></> : <Text style={styles.nextTitle}>Série terminée</Text>}</Panel>}
   </View></Screen>;
 }

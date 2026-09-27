@@ -1,4 +1,4 @@
-import { useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text } from 'react-native';
 import { Screen } from '../components/Screen';
@@ -15,6 +15,7 @@ export function MoviePlayerScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [media, setMedia] = useState<{ id: string; name: string; resumeSeconds: number; uri: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [fullscreen, setFullscreen] = useState(false);
   useEffect(() => {
     if (!id) return;
     Promise.all([discovery.movieById(id), progressRepository.get(id, 'movie')])
@@ -24,7 +25,10 @@ export function MoviePlayerScreen() {
       })
       .catch((caught) => setError(caught instanceof Error ? caught.message : 'Lecture impossible.'));
   }, [id]);
-  return <Screen>{media ? <TrackedVideoPlayer key={media.id} mediaId={media.id} mediaKind="movie" name={media.name} resumeSeconds={media.resumeSeconds} uri={media.uri} /> : error ? <Text style={styles.error}>{error}</Text> : <ActivityIndicator color={colors.accentStrong} size="large" />}</Screen>;
+  return <Screen fullscreen={fullscreen}>
+    <Stack.Screen options={{ headerShown: !fullscreen, title: media?.name ?? 'Film' }} />
+    {media ? <TrackedVideoPlayer key={media.id} mediaId={media.id} mediaKind="movie" name={media.name} onFullscreenChange={setFullscreen} resumeSeconds={media.resumeSeconds} uri={media.uri} /> : error ? <Text style={styles.error}>{error}</Text> : <ActivityIndicator color={colors.accentStrong} size="large" />}
+  </Screen>;
 }
 
 const styles = StyleSheet.create({ error: { color: colors.danger, fontSize: 17, padding: spacing.xl, textAlign: 'center' } });

@@ -5,11 +5,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../theme/tokens';
 import { NexusSidebar } from './NexusNavigation';
 
-type ScreenProps = PropsWithChildren<{ navigation?: boolean }>;
+type ScreenProps = PropsWithChildren<{ fullscreen?: boolean; navigation?: boolean }>;
 
-export function NexusScreen({ children, navigation = false }: ScreenProps) {
+export function NexusScreen({ children, fullscreen = false, navigation = false }: ScreenProps) {
   return (
-    <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
+    <SafeAreaView edges={fullscreen ? [] : ['top', 'left', 'right']} style={styles.safeArea}>
       <View style={styles.row}>
         {navigation && <NexusSidebar />}
         <View style={styles.content}>{children}</View>

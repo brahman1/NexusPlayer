@@ -186,9 +186,28 @@ reprise, **Synchronisation Xtream complète**.
   diagnostic restant est le React 19.2.4 de l'autre projet situé dans le dossier
   parent, tandis que NexusPlayer utilise la version 19.2.3 attendue par Expo 57.
 
+### Corrections lecteur VOD mobile — 27 septembre 2026
+
+- Implémenté : curseur natif tactile permettant d'avancer ou reculer précisément,
+  en complément des boutons de saut rapide.
+- Implémenté : commandes Lire/Pause, Stop, plein écran avec verrouillage paysage
+  et sortie explicite du plein écran.
+- Implémenté : démarrage manuel du Picture-in-Picture et tentative automatique
+  lors du passage de l'application en arrière-plan.
+- Implémenté : détection et sélection réelles des pistes VLC audio et sous-titres,
+  avec désactivation explicite des sous-titres.
+- Corrigé : l'en-tête affiche maintenant le nom du film ou celui de la série avec
+  la saison et l'épisode, au lieu du chemin technique Expo Router.
+- Validé automatiquement : TypeScript, ESLint, 20 suites / 62 tests, bundle iOS
+  `dist-ios-vod-controls` et bundle Android TV `dist-tv-vod-controls`.
+- À confirmer sur le nouvel exécutable iPhone : démarrage automatique du PiP,
+  rotation plein écran et sélection des pistes sur plusieurs conteneurs vidéo.
+
 Le prochain chantier est désormais le point 4 de la liste de reprise,
 **Validation physique multiplateforme**. Il nécessite les appareils du
-propriétaire ; commencer par iPhone/iPad, puis Android TV physique et Apple TV.
+propriétaire ; commencer par reconstruire l'application iPhone, puis valider ce
+lecteur avant l'envoi TestFlight. Continuer ensuite sur Android TV physique et
+Apple TV.
 
 1. **Fiabiliser le lecteur Live**
    - enregistrer la chaîne en cours et relancer automatiquement la lecture après

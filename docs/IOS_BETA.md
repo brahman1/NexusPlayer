@@ -76,6 +76,11 @@ NexusPlayer utilise également un lecteur VLC natif pour les films et les série
 actualisation Metro/Expo ne suffit pas non plus : `prebuild`, `pod-install`, puis
 une nouvelle compilation Xcode sont obligatoires.
 
+Le curseur tactile, la rotation plein écran et le Picture-in-Picture utilisent
+également des modules natifs. Après récupération du commit qui les ajoute, il faut
+donc reconstruire l'application ; une actualisation JavaScript de l'ancien build
+ne peut pas faire apparaître ces fonctions.
+
 ## 5. Ouvrir le projet dans Xcode
 
 ```bash
