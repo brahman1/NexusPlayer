@@ -242,6 +242,22 @@ Apple TV.
   Android agrandie, zones de surbalayage TV, focus aux quatre bords et orientations
   portrait/paysage sur les appareils réels ciblés.
 
+### Correctifs lecteur VOD iPhone — 28 septembre 2026
+
+- Corrigé : après déplacement du curseur, le lecteur relance explicitement la
+  lecture à la position choisie au lieu de rester bloqué en chargement.
+- Corrigé : l'indicateur de chargement est temporisé et disparaît dès que VLC
+  signale une progression ou reprend effectivement la lecture.
+- Refait : commandes principales toujours visibles sur une rangée et options
+  Audio, Sous-titres, PiP et plein écran sur une grille adaptative sans bouton
+  tronqué ; ce composant partagé couvre les films et les épisodes.
+- Corrigé : en portrait, le lecteur commence directement sous l'en-tête au lieu
+  d'être centré trop bas dans la page.
+- Validé automatiquement : TypeScript, ESLint, 21 suites / 66 tests, bundle iOS
+  mobile et bundle Android TV.
+- À confirmer sur l'iPhone réel : seek court et seek de plus d'une heure sur un
+  film et un épisode provenant du fournisseur utilisé pour le test.
+
 1. **Fiabiliser le lecteur Live**
    - enregistrer la chaîne en cours et relancer automatiquement la lecture après
      une interruption réseau récupérable ;

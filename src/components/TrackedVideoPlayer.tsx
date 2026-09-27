@@ -4,7 +4,7 @@ import { LibVlcPlayerView, type LibVlcPlayerViewRef, type MediaTrack, type Track
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, AppState, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { WatchProgressRepository } from '../repositories/WatchProgressRepository';
 import { describePlaybackError } from '../services/playbackError';
@@ -25,6 +25,8 @@ type Props = {
 type TrackPanel = 'audio' | 'subtitle' | null;
 
 export function TrackedVideoPlayer({ mediaId, mediaKind, name, onEnded, onFullscreenChange, resumeSeconds, uri }: Props) {
+  const { width } = useWindowDimensions();
+  const compact = !Platform.isTV && width < 600;
   const playerRef = useRef<LibVlcPlayerViewRef>(null);
   const completed = useRef(false);
   const latestPosition = useRef(resumeSeconds);
@@ -32,6 +34,7 @@ export function TrackedVideoPlayer({ mediaId, mediaKind, name, onEnded, onFullsc
   const latestRatio = useRef(0);
   const lastSavedAt = useRef(resumeSeconds);
   const queue = useRef<Promise<unknown>>(Promise.resolve());
+  const bufferingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [duration, setDuration] = useState(0);
   const [position, setPosition] = useState(resumeSeconds);
   const [scrubPosition, setScrubPosition] = useState(resumeSeconds);
@@ -68,13 +71,30 @@ export function TrackedVideoPlayer({ mediaId, mediaKind, name, onEnded, onFullsc
       .catch(() => undefined);
   }, [mediaId, mediaKind, onEnded]);
 
-  const seekTo = useCallback((seconds: number) => {
+  const clearBufferingTimer = useCallback(() => {
+    if (bufferingTimer.current) clearTimeout(bufferingTimer.current);
+    bufferingTimer.current = null;
+  }, []);
+
+  const scheduleBufferingIndicator = useCallback(() => {
+    if (bufferingTimer.current) return;
+    bufferingTimer.current = setTimeout(() => setBuffering(true), 650);
+  }, []);
+
+  const seekTo = useCallback(async (seconds: number) => {
     const target = Math.max(0, Math.min(latestDuration.current || Number.MAX_SAFE_INTEGER, seconds));
     latestPosition.current = target;
     setPosition(target);
     setScrubPosition(target);
-    void playerRef.current?.seek(Math.round(target * 1000), 'time');
-  }, []);
+    setBuffering(true);
+    try {
+      await playerRef.current?.seek(Math.round(target * 1000), 'time');
+      if (playing) await playerRef.current?.play();
+    } catch {
+      setBuffering(false);
+      setNotice('Impossible d’atteindre cette position dans le flux.');
+    }
+  }, [playing]);
 
   const seekBy = useCallback((seconds: number) => seekTo(latestPosition.current + seconds), [seekTo]);
 
@@ -125,13 +145,14 @@ export function TrackedVideoPlayer({ mediaId, mediaKind, name, onEnded, onFullsc
   }, [enqueueSave, pipActive, playing, startPictureInPicture]);
 
   useEffect(() => () => {
+    clearBufferingTimer();
     onFullscreenChange?.(false);
     if (!Platform.isTV) void ScreenOrientation.unlockAsync();
-  }, [onFullscreenChange]);
+  }, [clearBufferingTimer, onFullscreenChange]);
 
   const displayedPosition = seeking ? scrubPosition : position;
 
-  return <View style={[styles.container, fullscreen && styles.containerFullscreen]}>
+  return <View style={[styles.container, compact && styles.containerCompact, fullscreen && styles.containerFullscreen]}>
     <StatusBar hidden={fullscreen} />
     <View style={[styles.playerFrame, fullscreen && styles.playerFrameFullscreen]}>
       <LibVlcPlayerView
@@ -139,8 +160,16 @@ export function TrackedVideoPlayer({ mediaId, mediaKind, name, onEnded, onFullsc
         aspectRatio={fullscreen ? undefined : '16:9'}
         autoplay
         contentFit="contain"
-        onBuffering={({ value }) => setBuffering(value < 100)}
+        onBuffering={({ value }) => {
+          if (value >= 100) {
+            clearBufferingTimer();
+            setBuffering(false);
+          } else {
+            scheduleBufferingIndicator();
+          }
+        }}
         onEncounteredError={({ message }) => {
+          clearBufferingTimer();
           setBuffering(false);
           setError(message);
         }}
@@ -149,6 +178,7 @@ export function TrackedVideoPlayer({ mediaId, mediaKind, name, onEnded, onFullsc
           setSubtitleTracks(subtitle);
         }}
         onFirstPlay={({ media }) => {
+          clearBufferingTimer();
           const seconds = Math.max(0, media.length / 1000);
           latestDuration.current = seconds;
           setDuration(seconds);
@@ -159,18 +189,22 @@ export function TrackedVideoPlayer({ mediaId, mediaKind, name, onEnded, onFullsc
         onPictureInPictureStart={() => setPipActive(true)}
         onPictureInPictureStop={() => setPipActive(false)}
         onPlaying={() => {
+          clearBufferingTimer();
           setPlaying(true);
           setBuffering(false);
           setError(null);
         }}
         onPositionChanged={({ value }) => { latestRatio.current = value; }}
         onStopped={() => {
+          clearBufferingTimer();
           setPlaying(false);
           setBuffering(false);
           if (latestRatio.current >= 0.98) finishPlayback();
           else enqueueSave(true);
         }}
         onTimeChanged={({ value }) => {
+          clearBufferingTimer();
+          setBuffering(false);
           const seconds = Math.max(0, value / 1000);
           latestPosition.current = seconds;
           if (!seeking) {
@@ -199,8 +233,8 @@ export function TrackedVideoPlayer({ mediaId, mediaKind, name, onEnded, onFullsc
           maximumValue={Math.max(duration, 1)}
           minimumTrackTintColor={colors.accentStrong}
           minimumValue={0}
-          onSlidingComplete={(value) => { setSeeking(false); seekTo(value); }}
-          onSlidingStart={() => setSeeking(true)}
+          onSlidingComplete={(value) => { setSeeking(false); void seekTo(value); }}
+          onSlidingStart={() => { setSeeking(true); clearBufferingTimer(); }}
           onValueChange={setScrubPosition}
           step={1}
           style={styles.slider}
@@ -210,16 +244,18 @@ export function TrackedVideoPlayer({ mediaId, mediaKind, name, onEnded, onFullsc
         <View style={styles.timeRow}><Text style={styles.time}>{formatTime(displayedPosition)}</Text><Text style={styles.time}>{duration > 0 ? formatTime(duration) : '--:--'}</Text></View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.controls} horizontal showsHorizontalScrollIndicator={false}>
-        <ControlButton icon="play-back" label="-10 s" onPress={() => seekBy(-10)} />
-        <ControlButton icon={playing ? 'pause' : 'play'} label={playing ? 'Pause' : 'Lire'} onPress={togglePlayback} primary />
-        <ControlButton icon="stop" label="Stop" onPress={stopPlayback} />
-        <ControlButton icon="play-forward" label="+30 s" onPress={() => seekBy(30)} />
-        <ControlButton icon="volume-high" label="Audio" onPress={() => setTrackPanel((value) => value === 'audio' ? null : 'audio')} />
-        <ControlButton icon="text" label="Sous-titres" onPress={() => setTrackPanel((value) => value === 'subtitle' ? null : 'subtitle')} />
-        {!Platform.isTV && <ControlButton icon="albums-outline" label="Image dans l’image" onPress={() => void startPictureInPicture()} />}
-        <ControlButton icon={fullscreen ? 'contract' : 'expand'} label={fullscreen ? 'Quitter le plein écran' : 'Plein écran'} onPress={() => void toggleFullscreen()} />
-      </ScrollView>
+      <View style={styles.transportControls}>
+        <ControlButton compact={compact} icon="play-back" label="-10 s" onPress={() => void seekBy(-10)} style={styles.transportButton} />
+        <ControlButton compact={compact} icon={playing ? 'pause' : 'play'} label={playing ? 'Pause' : 'Lire'} onPress={togglePlayback} primary style={styles.transportButton} />
+        <ControlButton compact={compact} icon="stop" label="Stop" onPress={stopPlayback} style={styles.transportButton} />
+        <ControlButton compact={compact} icon="play-forward" label="+30 s" onPress={() => void seekBy(30)} style={styles.transportButton} />
+      </View>
+      <View style={styles.secondaryControls}>
+        <ControlButton compact={compact} icon="volume-high" label="Audio" onPress={() => setTrackPanel((value) => value === 'audio' ? null : 'audio')} style={compact && styles.secondaryButtonCompact} />
+        <ControlButton compact={compact} icon="text" label="Sous-titres" onPress={() => setTrackPanel((value) => value === 'subtitle' ? null : 'subtitle')} style={compact && styles.secondaryButtonCompact} />
+        {!Platform.isTV && <ControlButton compact={compact} icon="albums-outline" label="Image dans l’image" onPress={() => void startPictureInPicture()} style={compact && styles.secondaryButtonCompact} />}
+        <ControlButton compact={compact} icon={fullscreen ? 'contract' : 'expand'} label={fullscreen ? 'Quitter le plein écran' : 'Plein écran'} onPress={() => void toggleFullscreen()} style={compact && styles.secondaryButtonCompact} />
+      </View>
 
       {trackPanel === 'audio' && <TrackSelector emptyLabel="Aucune autre piste audio détectée" label="Langue audio" onSelect={(id) => setTracks((current) => ({ ...current, audio: id }))} selectedId={tracks.audio} tracks={audioTracks} />}
       {trackPanel === 'subtitle' && <TrackSelector allowDisabled emptyLabel="Aucun sous-titre détecté" label="Sous-titres" onSelect={(id) => setTracks((current) => ({ ...current, subtitle: id }))} selectedId={tracks.subtitle} tracks={subtitleTracks} />}
@@ -245,10 +281,10 @@ function TrackButton({ active, label, onPress }: { active: boolean; label: strin
   return <Pressable accessibilityRole="button" onPress={onPress} style={[styles.trackButton, active && styles.trackButtonActive]}><Text style={styles.trackButtonText}>{active ? `✓ ${label}` : label}</Text></Pressable>;
 }
 
-function ControlButton({ icon, label, onPress, primary = false }: { icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void; primary?: boolean }) {
-  return <Pressable accessibilityLabel={label} accessibilityRole="button" onPress={onPress} style={({ focused, pressed }) => [styles.controlButton, primary && styles.controlButtonPrimary, (focused || pressed) && styles.controlButtonFocused]}>
-    <Ionicons color={colors.text} name={icon} size={22} />
-    <Text style={styles.controlLabel}>{label}</Text>
+function ControlButton({ compact = false, icon, label, onPress, primary = false, style }: { compact?: boolean; icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void; primary?: boolean; style?: StyleProp<ViewStyle> }) {
+  return <Pressable accessibilityLabel={label} accessibilityRole="button" onPress={onPress} style={({ focused, pressed }) => [styles.controlButton, compact && styles.controlButtonCompact, primary && styles.controlButtonPrimary, (focused || pressed) && styles.controlButtonFocused, style]}>
+    <Ionicons color={colors.text} name={icon} size={compact ? 19 : 22} />
+    <Text adjustsFontSizeToFit maxFontSizeMultiplier={1.25} numberOfLines={1} style={[styles.controlLabel, compact && styles.controlLabelCompact]}>{label}</Text>
   </Pressable>;
 }
 
@@ -262,6 +298,7 @@ function formatTime(seconds: number) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, justifyContent: 'center', padding: spacing.lg },
+  containerCompact: { justifyContent: 'flex-start', padding: 12 },
   containerFullscreen: { backgroundColor: '#000', padding: 0 },
   playerFrame: { aspectRatio: 16 / 9, backgroundColor: '#000', position: 'relative', width: '100%' },
   playerFrameFullscreen: { aspectRatio: undefined, flex: 1 },
@@ -273,11 +310,16 @@ const styles = StyleSheet.create({
   slider: { height: 38, width: '100%' },
   timeRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: -spacing.xs },
   time: { color: colors.textMuted, fontSize: 13, fontVariant: ['tabular-nums'] },
-  controls: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm, justifyContent: 'center', paddingHorizontal: spacing.xs, paddingVertical: spacing.sm },
+  transportControls: { alignItems: 'stretch', flexDirection: 'row', gap: spacing.sm, justifyContent: 'center', paddingVertical: spacing.sm },
+  transportButton: { flex: 1, minWidth: 0 },
+  secondaryControls: { alignItems: 'stretch', flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, justifyContent: 'center', paddingBottom: spacing.sm },
+  secondaryButtonCompact: { flexBasis: '47%', flexGrow: 1, minWidth: 0 },
   controlButton: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radii.pill, borderWidth: 1, flexDirection: 'row', gap: spacing.sm, justifyContent: 'center', minHeight: 48, minWidth: 96, paddingHorizontal: spacing.md },
+  controlButtonCompact: { gap: spacing.xs, minWidth: 0, paddingHorizontal: spacing.sm },
   controlButtonPrimary: { backgroundColor: colors.accent, borderColor: colors.accentStrong },
   controlButtonFocused: { borderColor: colors.focus, borderWidth: 3, transform: [{ scale: 1.04 }] },
   controlLabel: { color: colors.text, fontSize: 14, fontWeight: '800' },
+  controlLabelCompact: { fontSize: 12 },
   trackPanel: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radii.md, borderWidth: 1, marginTop: spacing.sm, padding: spacing.sm },
   trackTitle: { color: colors.text, fontSize: 15, fontWeight: '900', marginBottom: spacing.xs },
   trackList: { alignItems: 'center', gap: spacing.sm },
