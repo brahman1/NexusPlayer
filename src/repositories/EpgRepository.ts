@@ -5,6 +5,7 @@ import type { HttpValidators } from '../services/httpValidators';
 import type { ParsedXmltvProgramme } from '../services/xmltvParser';
 
 type EpgRow = { id: string; playlist_id: string; channel_tvg_id: string; title: string; description: string | null; starts_at: string; ends_at: string };
+export type GuideProgramme = EpgProgramme & { channelId: string; channelName: string; logoUrl: string | null };
 function map(row: EpgRow): EpgProgramme {
   return { id: row.id, playlistId: row.playlist_id, channelTvgId: row.channel_tvg_id, title: row.title, description: row.description, startsAt: row.starts_at, endsAt: row.ends_at };
 }
@@ -31,6 +32,22 @@ export async function replaceEpg(playlistId: string, endpoint: string, programme
 }
 
 export class EpgRepository {
+  async guideRange(windowStart: Date, windowEnd: Date, limit = 4_000): Promise<GuideProgramme[]> {
+    const database = await getDatabase();
+    return database.getAllAsync<GuideProgramme>(
+      `SELECT DISTINCT ep.id, ep.playlist_id AS playlistId, ep.channel_tvg_id AS channelTvgId,
+              ep.title, ep.description, ep.starts_at AS startsAt, ep.ends_at AS endsAt,
+              ch.id AS channelId, ch.name AS channelName, ch.logo_url AS logoUrl
+       FROM epg_programmes ep JOIN channels ch
+         ON ch.playlist_id = ep.playlist_id
+        AND (ch.tvg_id = ep.channel_tvg_id OR ch.tvg_name = ep.channel_tvg_id OR ch.name = ep.channel_tvg_id)
+       WHERE ep.starts_at < ? AND ep.ends_at > ?
+       ORDER BY ch.name COLLATE NOCASE, ep.starts_at
+       LIMIT ?`,
+      windowEnd.toISOString(), windowStart.toISOString(), Math.min(Math.max(limit, 1), 10_000),
+    );
+  }
+
   async nowNext(playlistId: string, tvgId: string | null, tvgName: string | null, channelName: string, at = new Date()) {
     const database = await getDatabase();
     const keys = [tvgId, tvgName, channelName].filter((value): value is string => Boolean(value?.trim()));

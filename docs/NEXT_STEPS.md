@@ -132,6 +132,23 @@ Les quatre premiers points sont les prochains chantiers de développement. Les
 points 5 et 6 nécessitent les comptes, appareils et validations de distribution
 du propriétaire de l'application.
 
+### Avancement Guide EPG — 27 septembre 2026
+
+- Implémenté : vue Maintenant avec progression du programme en cours.
+- Implémenté : grille virtualisée par chaîne sur une fenêtre de quatre heures,
+  créneaux de trente minutes et ligne temporelle du direct.
+- Implémenté : navigation par jour, retour à aujourd'hui et déplacement de deux
+  heures vers l'avant ou l'arrière.
+- Implémenté : fiche programme avec horaire, description, chaîne et action de
+  lecture, entièrement accessible au toucher et au D-pad.
+- Validé automatiquement : calculs de créneaux, troncature des programmes aux
+  limites de la grille, détection du direct, TypeScript et ESLint.
+- À confirmer au point 4 de la liste de reprise : fluidité et restauration du
+  focus avec un guide XMLTV réel très volumineux sur appareils physiques.
+
+Le prochain chantier implémentable est désormais le point 2 de la liste de
+reprise, **Synchronisation Xtream complète**.
+
 1. **Fiabiliser le lecteur Live**
    - enregistrer la chaîne en cours et relancer automatiquement la lecture après
      une interruption réseau récupérable ;
