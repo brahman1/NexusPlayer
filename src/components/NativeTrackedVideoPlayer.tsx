@@ -1,6 +1,6 @@
 import { useEvent, useEventListener } from 'expo';
 import { useVideoPlayer, VideoView, type VideoSource } from 'expo-video';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { AppState, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { WatchProgressRepository } from '../repositories/WatchProgressRepository';
@@ -16,12 +16,13 @@ function sourceFor(uri: string): VideoSource {
   return extension === 'm3u8' ? { uri, contentType: 'hls' } : { uri, contentType: 'progressive' };
 }
 
-export function NativeTrackedVideoPlayer({ mediaId, mediaKind, name, nextEpisode, onEnded, onFatalError, onFullscreenChange, onReady, resumeSeconds, uri }: TrackedVideoPlayerProps) {
+export function NativeTrackedVideoPlayer({ mediaId, mediaKind, name, nextEpisode, onEnded, onFatalError, onFullscreenChange, onReady, onProgress, resumeSeconds, uri }: TrackedVideoPlayerProps) {
   const lastSaved = useRef(resumeSeconds);
   const latestPosition = useRef(resumeSeconds);
   const latestDuration = useRef(0);
   const completed = useRef(false);
-  const player = useVideoPlayer(sourceFor(uri), (instance) => {
+  const source = useMemo(() => sourceFor(uri), [uri]);
+  const player = useVideoPlayer(source, (instance) => {
     instance.timeUpdateEventInterval = 1;
     instance.seekTolerance = { toleranceBefore: 2, toleranceAfter: 2 };
     instance.bufferOptions = { maxBufferBytes: 0, minBufferForPlayback: 1.5, preferredForwardBufferDuration: 8 };
@@ -35,11 +36,14 @@ export function NativeTrackedVideoPlayer({ mediaId, mediaKind, name, nextEpisode
     if (completed.current || latestDuration.current <= 0) return;
     if (!force && Math.abs(latestPosition.current - lastSaved.current) < 5) return;
     lastSaved.current = latestPosition.current;
-    void progressRepository.save(mediaId, mediaKind, latestPosition.current, latestDuration.current);
+    void progressRepository.save(mediaId, mediaKind, latestPosition.current, latestDuration.current).catch(() => undefined);
   }, [mediaId, mediaKind]);
 
   useEventListener(player, 'sourceLoad', ({ duration }) => { latestDuration.current = duration; });
-  useEventListener(player, 'timeUpdate', ({ currentTime }) => { latestPosition.current = currentTime; save(); });
+  useEventListener(player, 'timeUpdate', ({ currentTime }) => {
+    if (resumeSeconds >= 10 && latestPosition.current === resumeSeconds && currentTime < 1) return;
+    latestPosition.current = currentTime; onProgress?.(currentTime); save();
+  });
   useEventListener(player, 'playToEnd', () => {
     completed.current = true;
     void progressRepository.clear(mediaId, mediaKind).then(() => onEnded?.());

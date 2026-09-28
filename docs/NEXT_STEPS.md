@@ -1,5 +1,34 @@
 # Reprise immédiate du développement
 
+## Dernier correctif — Live, catalogue complet et seek (28 septembre 2026)
+
+- L'indicateur Live tient compte des timestamps qui avancent ; un événement VLC
+  de buffering isolé ne recouvre plus une lecture en cours. Options VLC stables.
+- Films/Séries : ancienne limite de 2 000 titres supprimée de l'écran. Recherche
+  SQL sur toute la base importée, décompte réel, pagination de 48, « Tout voir »
+  pour toutes les catégories, favoris et titres récents. Les rayons sont virtualisés.
+- Métadonnées du catalogue mises en cache jusqu'au changement de source ; favoris
+  et reprise rafraîchis au retour sans effacer le catalogue visible.
+- « Films les plus récents » trie l'année de sortie disponible ; « Derniers titres
+  importés » suit l'ordre local. Ce ne sont pas des sorties vérifiées via un service
+  externe et aucun classement de popularité Netflix n'est inventé.
+- Seek VLC : pressions rapides regroupées (150 ms), pas de relance `play()` à chaque
+  seek, sauvegarde limitée à la position confirmée, rejet des anciens timestamps.
+  Une bascule de moteur conserve la dernière position lue.
+- Vérification reproductible du catalogue : `node scripts/verify-catalog.cjs`
+  (Node 22.13+) utilise SQLite en mémoire, 2 505 films, 2 505 séries et 17 catégories
+  par type. Ne touche pas aux données utilisateur.
+- Validation de ce lot : 27 suites / 86 tests, TypeScript, ESLint et exports JS
+  iOS (`dist-ios-catalog-playback-fix`) / Android TV
+  (`dist-tv-catalog-playback-fix`) réussis. Ces exports ne remplacent pas une
+  compilation native ni une mesure des flux sur appareil réel.
+- Prochaine validation : sur iPhone réel, mesurer démarrage, reprise à 20 min et
+  seek ±10 min pour un MP4 puis un MKV autorisé. Relever le délai jusqu'à une image
+  qui avance. Les objectifs < 2–3 s ne sont pas encore mesurés ni garantis.
+- Si le délai reste long : instrumenter l'accès HTTP/Range et le décodeur sur le
+  Mac/iPhone. Les anciens HTTP 460 ne prouvaient pas une cause codec ni une limite
+  de connexions ; ne pas présenter ces hypothèses comme diagnostic confirmé.
+
 Ce fichier est le point d'entrée obligatoire quand l'utilisateur dit simplement
 « continue les développements ». Ne pas refaire une analyse générale : commencer
 directement par la prochaine tâche ci-dessous, puis avancer dans l'ordre indiqué.

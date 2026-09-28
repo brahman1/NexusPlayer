@@ -9,6 +9,7 @@ import { ActivityIndicator, AppState, Platform, Pressable, ScrollView, StyleShee
 import { WatchProgressRepository } from '../repositories/WatchProgressRepository';
 import { describePlaybackError } from '../services/playbackError';
 import { colors, radii, spacing } from '../theme/tokens';
+import { reachedSeekTarget } from '../services/playbackActivity';
 
 const progressRepository = new WatchProgressRepository();
 const VOD_PLAYER_OPTIONS = ['--network-caching=750', '--input-fast-seek', '--http-reconnect'];
@@ -22,6 +23,7 @@ export type TrackedVideoPlayerProps = {
   onFatalError?: (message: string) => void;
   onFullscreenChange?: (fullscreen: boolean) => void;
   onReady?: () => void;
+  onProgress?: (seconds: number) => void;
   resumeSeconds: number;
   uri: string;
 };
@@ -32,11 +34,12 @@ function playableTracks(items: MediaTrack[]) {
   return items.filter((item, index) => item.id >= 0 && items.findIndex((candidate) => candidate.id === item.id) === index);
 }
 
-export function TrackedVideoPlayer({ mediaId, mediaKind, name, nextEpisode, onEnded, onFatalError, onFullscreenChange, onReady, resumeSeconds, uri }: TrackedVideoPlayerProps) {
+export function TrackedVideoPlayer({ mediaId, mediaKind, name, nextEpisode, onEnded, onFatalError, onFullscreenChange, onReady, onProgress, resumeSeconds, uri }: TrackedVideoPlayerProps) {
   const { width } = useWindowDimensions();
   const compact = !Platform.isTV && width < 600;
   const playerRef = useRef<LibVlcPlayerViewRef>(null);
   const completed = useRef(false);
+  const stoppedByUser = useRef(false);
   const latestPosition = useRef(resumeSeconds);
   const latestDuration = useRef(0);
   const latestRatio = useRef(0);
@@ -45,6 +48,8 @@ export function TrackedVideoPlayer({ mediaId, mediaKind, name, nextEpisode, onEn
   const bufferingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const seekWatchdog = useRef<ReturnType<typeof setTimeout> | null>(null);
   const seekGeneration = useRef(0);
+  const pendingSeek = useRef<number | null>(null);
+  const seekDispatch = useRef<ReturnType<typeof setTimeout> | null>(null);
   const controlsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [duration, setDuration] = useState(0);
   const [position, setPosition] = useState(resumeSeconds);
@@ -71,7 +76,7 @@ export function TrackedVideoPlayer({ mediaId, mediaKind, name, nextEpisode, onEn
   );
 
   const enqueueSave = useCallback((force = false) => {
-    if (completed.current) return;
+    if (completed.current || pendingSeek.current !== null) return;
     const currentPosition = latestPosition.current;
     if (!force && Math.abs(currentPosition - lastSavedAt.current) < 5) return;
     lastSavedAt.current = currentPosition;
@@ -115,12 +120,15 @@ export function TrackedVideoPlayer({ mediaId, mediaKind, name, nextEpisode, onEn
     if (fullscreen) controlsTimer.current = setTimeout(() => setControlsVisible(false), 3500);
   }, [clearControlsTimer, fullscreen]);
 
-  const seekTo = useCallback(async (seconds: number) => {
+  const seekTo = useCallback((seconds: number) => {
+    if (!seekable || latestDuration.current <= 0) return;
     const target = Math.max(0, Math.min(latestDuration.current || Number.MAX_SAFE_INTEGER, seconds));
     const generation = ++seekGeneration.current;
-    latestPosition.current = target;
+    pendingSeek.current = target;
+    if (seekDispatch.current) clearTimeout(seekDispatch.current);
     setPosition(target);
     setScrubPosition(target);
+    setNotice(null);
     clearBufferingTimer();
     clearSeekWatchdog();
     scheduleBufferingIndicator();
@@ -128,33 +136,41 @@ export function TrackedVideoPlayer({ mediaId, mediaKind, name, nextEpisode, onEn
       if (seekGeneration.current !== generation) return;
       clearBufferingTimer();
       setBuffering(false);
-      setNotice('Le serveur met trop de temps à atteindre cette position. Réessayez ou utilisez les boutons ±10/30 s.');
+      pendingSeek.current = null;
+      setPosition(latestPosition.current);
+      setScrubPosition(latestPosition.current);
+      setNotice('La position demandée n’a pas été confirmée. Le serveur ou le fichier peut limiter l’avance rapide.');
     }, 8000);
-    try {
-      const mediaDuration = latestDuration.current;
-      if (mediaDuration > 0) await playerRef.current?.seek(Math.max(0, Math.min(1, target / mediaDuration)), 'position');
-      else await playerRef.current?.seek(Math.round(target * 1000), 'time');
-      if (playing) await playerRef.current?.play();
-    } catch {
-      clearSeekWatchdog();
-      clearBufferingTimer();
-      setBuffering(false);
-      setNotice('Impossible d’atteindre cette position dans le flux.');
-    }
-  }, [clearBufferingTimer, clearSeekWatchdog, playing, scheduleBufferingIndicator]);
+    // Coalesce rapid button presses; do not restart playback for each seek.
+    seekDispatch.current = setTimeout(() => {
+      void playerRef.current?.seek(target / latestDuration.current, 'position').catch(() => {
+        if (generation !== seekGeneration.current) return;
+        pendingSeek.current = null;
+        clearSeekWatchdog();
+        clearBufferingTimer();
+        setBuffering(false);
+        setPosition(latestPosition.current);
+        setNotice('Impossible d’atteindre cette position dans le flux.');
+      });
+    }, 150);
+  }, [clearBufferingTimer, clearSeekWatchdog, scheduleBufferingIndicator, seekable]);
 
-  const seekBy = useCallback((seconds: number) => seekTo(latestPosition.current + seconds), [seekTo]);
+  const seekBy = useCallback((seconds: number) => seekTo((pendingSeek.current ?? latestPosition.current) + seconds), [seekTo]);
 
   const togglePlayback = useCallback(() => {
     if (playing) void playerRef.current?.pause();
-    else void playerRef.current?.play();
+    else { stoppedByUser.current = false; void playerRef.current?.play(); }
   }, [playing]);
 
   const stopPlayback = useCallback(() => {
+    stoppedByUser.current = true;
+    if (seekDispatch.current) clearTimeout(seekDispatch.current);
+    pendingSeek.current = null;
+    clearSeekWatchdog();
     enqueueSave(true);
     void playerRef.current?.stop();
     setPlaying(false);
-  }, [enqueueSave]);
+  }, [clearSeekWatchdog, enqueueSave]);
 
   const toggleFullscreen = useCallback(async () => {
     const next = !fullscreen;
@@ -195,6 +211,7 @@ export function TrackedVideoPlayer({ mediaId, mediaKind, name, nextEpisode, onEn
   }, [enqueueSave, pipActive, playing, startPictureInPicture]);
 
   useEffect(() => () => {
+    if (seekDispatch.current) clearTimeout(seekDispatch.current);
     clearBufferingTimer();
     clearSeekWatchdog();
     clearControlsTimer();
@@ -229,7 +246,6 @@ export function TrackedVideoPlayer({ mediaId, mediaKind, name, nextEpisode, onEn
         onBuffering={({ value }) => {
           if (value >= 100) {
             clearBufferingTimer();
-            clearSeekWatchdog();
             setBuffering(false);
           } else {
             scheduleBufferingIndicator();
@@ -248,7 +264,6 @@ export function TrackedVideoPlayer({ mediaId, mediaKind, name, nextEpisode, onEn
         }}
         onFirstPlay={({ media }) => {
           clearBufferingTimer();
-          clearSeekWatchdog();
           const seconds = Math.max(0, media.length / 1000);
           latestDuration.current = seconds;
           setDuration(seconds);
@@ -261,10 +276,10 @@ export function TrackedVideoPlayer({ mediaId, mediaKind, name, nextEpisode, onEn
         onPictureInPictureStop={() => setPipActive(false)}
         onPlaying={() => {
           clearBufferingTimer();
-          clearSeekWatchdog();
           setPlaying(true);
           setBuffering(false);
           setError(null);
+          onReady?.();
         }}
         onPositionChanged={({ value }) => { latestRatio.current = value; }}
         onStopped={() => {
@@ -272,15 +287,23 @@ export function TrackedVideoPlayer({ mediaId, mediaKind, name, nextEpisode, onEn
           clearSeekWatchdog();
           setPlaying(false);
           setBuffering(false);
-          if (latestRatio.current >= 0.98) finishPlayback();
+          if (!stoppedByUser.current && pendingSeek.current === null && latestRatio.current >= 0.98) finishPlayback();
           else enqueueSave(true);
         }}
         onTimeChanged={({ value }) => {
-          clearBufferingTimer();
-          clearSeekWatchdog();
-          setBuffering(false);
           const seconds = Math.max(0, value / 1000);
+          if (pendingSeek.current !== null) {
+            if (!reachedSeekTarget(seconds, pendingSeek.current)) return;
+            pendingSeek.current = null;
+            clearSeekWatchdog();
+            setNotice(null);
+          }
+          clearBufferingTimer();
+          setBuffering(false);
+          // Ignore early zero timestamps while VLC opens directly at the resume position.
+          if (resumeSeconds >= 10 && latestPosition.current === resumeSeconds && seconds < 1) return;
           latestPosition.current = seconds;
+          onProgress?.(seconds);
           if (!seeking) {
             setPosition(seconds);
             setScrubPosition(seconds);

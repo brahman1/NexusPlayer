@@ -22,11 +22,13 @@ import { isRecoverableLiveError, liveReconnectDelay, MAX_LIVE_RECONNECT_ATTEMPTS
 import { resolveXtreamChannel, resolveXtreamChannelCandidates } from '../services/xtreamImportService';
 import { alternateEngine, engineOrder, playbackPreferenceKey, type PlaybackEngine } from '../services/playbackStrategy';
 import { preferences } from '../storage/preferences';
+import { usePlaybackActivity } from '../hooks/usePlaybackActivity';
 import { colors, radii, spacing } from '../theme/tokens';
 import type { Channel } from '../types/domain';
 
 const repository = new SQLiteChannelRepository();
 const epgRepository = new EpgRepository();
+const LIVE_VLC_OPTIONS = ['--network-caching=1000', '--http-reconnect'];
 
 function sourceForChannel(channel: Channel): VideoSource {
   return channel.streamUrl.toLowerCase().includes('.m3u8')
@@ -68,6 +70,7 @@ function PlayerSurface({ channel, onAutomaticRetry, onEngineFailure, onEngineRea
   onEngineReady?: () => void;
 }) {
   const player = useVideoPlayer(sourceForChannel(channel), (instance) => {
+    instance.timeUpdateEventInterval = 0.5;
     instance.bufferOptions = {
       maxBufferBytes: 0,
       minBufferForPlayback: 1.5,
@@ -76,6 +79,9 @@ function PlayerSurface({ channel, onAutomaticRetry, onEngineFailure, onEngineRea
     instance.play();
   });
   const { status, error } = useEvent(player, 'statusChange', { status: player.status });
+  const activity = usePlaybackActivity();
+  useEventListener(player, 'timeUpdate', ({ currentTime }) => activity.onProgress(currentTime));
+  useEventListener(player, 'statusChange', ({ status: next }) => activity.onBuffering(next === 'loading' ? 0 : 100));
   const problem = status === 'error' ? explainPlaybackError(error?.message) : null;
   const recoverable = status === 'error' && isRecoverableLiveError(error?.message);
   const [autoReconnectEnabled, setAutoReconnectEnabled] = useState(true);
@@ -130,7 +136,7 @@ function PlayerSurface({ channel, onAutomaticRetry, onEngineFailure, onEngineRea
     <View style={styles.playerBlock}>
       <View style={styles.videoFrame}>
         <VideoView allowsPictureInPicture contentFit={contentFit} fullscreenOptions={{ enable: true }} nativeControls={!Platform.isTV} player={player} startsPictureInPictureAutomatically={!Platform.isTV} style={styles.video} />
-        {status === 'loading' && (
+        {status === 'loading' && activity.buffering && (
           <View pointerEvents="none" style={styles.loadingOverlay}>
             <ActivityIndicator color={colors.accentStrong} size="large" />
             <Text style={styles.loadingText}>Connexion au flux…</Text>
@@ -169,14 +175,13 @@ function PlayerSurface({ channel, onAutomaticRetry, onEngineFailure, onEngineRea
 }
 
 function VlcLiveSurface({ channel, onEngineFailure, onEngineReady }: { channel: Channel; onEngineFailure: () => void; onEngineReady: () => void }) {
-  const [loading, setLoading] = useState(true);
+  const activity = usePlaybackActivity();
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const problem = error ? explainPlaybackError(error) : null;
   useEffect(() => {
     if (ready || error) return;
     const timer = setTimeout(() => {
-      setLoading(false);
       setError('Délai de connexion dépassé pour ce flux.');
       onEngineFailure();
     }, 25_000);
@@ -187,15 +192,18 @@ function VlcLiveSurface({ channel, onEngineFailure, onEngineReady }: { channel: 
       <LibVlcPlayerView
         autoplay
         contentFit="contain"
-        onBuffering={({ value }) => setLoading(value < 100)}
-        onEncounteredError={({ message }) => { setLoading(false); setError(message); onEngineFailure(); }}
-        onPlaying={() => { setReady(true); setLoading(false); setError(null); onEngineReady(); }}
-        options={['--network-caching=1000', '--http-reconnect', '--clock-jitter=0']}
+        onBuffering={({ value }) => activity.onBuffering(value)}
+        onTimeChanged={({ value }) => {
+          if (activity.onProgress(value / 1000) && !ready) { setReady(true); onEngineReady(); }
+        }}
+        onEncounteredError={({ message }) => { setError(message); onEngineFailure(); }}
+        onPlaying={() => { activity.onPlaying(); setReady(true); setError(null); onEngineReady(); }}
+        options={LIVE_VLC_OPTIONS}
         pictureInPicture={!Platform.isTV}
         source={channel.streamUrl}
         style={styles.video}
       />
-      {loading && <View pointerEvents="none" style={styles.loadingOverlay}><ActivityIndicator color={colors.accentStrong} size="large" /><Text style={styles.loadingText}>Connexion au flux…</Text></View>}
+      {activity.buffering && !error && <View pointerEvents="none" style={styles.loadingOverlay}><ActivityIndicator color={colors.accentStrong} size="large" /><Text style={styles.loadingText}>Connexion au flux…</Text></View>}
     </View>
     {problem && <View accessibilityRole="alert" style={styles.problem}><Text style={styles.problemTitle}>{problem.title}</Text><Text style={styles.problemDetail}>{problem.detail}</Text></View>}
   </View>;

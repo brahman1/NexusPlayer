@@ -1,5 +1,5 @@
 import { Platform, StyleSheet, Text, View } from 'react-native';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { engineOrder, playbackPreferenceKey, type PlaybackEngine } from '../services/playbackStrategy';
 import { preferences } from '../storage/preferences';
@@ -17,16 +17,21 @@ export function AdaptiveVideoPlayer(props: TrackedVideoPlayerProps) {
   const [engineIndex, setEngineIndex] = useState(0);
   const [readyEngine, setReadyEngine] = useState<PlaybackEngine | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const latestPosition = useRef(props.resumeSeconds);
+  const switched = useRef(false);
+  const [startPosition, setStartPosition] = useState(props.resumeSeconds);
   const engine = engines[engineIndex] ?? engines[0]!;
 
   const fallback = useCallback(() => {
-    setEngineIndex((current) => {
-      if (current + 1 >= engines.length) return current;
-      setNotice('Optimisation du flux… changement de moteur.');
-      setReadyEngine(null);
-      return current + 1;
-    });
+    if (switched.current || engines.length < 2) return;
+    switched.current = true;
+    setStartPosition(latestPosition.current);
+    setNotice('Optimisation du flux… changement de moteur.');
+    setReadyEngine(null);
+    setEngineIndex(1);
   }, [engines.length]);
+
+  const progress = useCallback((seconds: number) => { latestPosition.current = seconds; }, []);
 
   const ready = useCallback(() => {
     preferences.setPlaybackEngine(preferenceKey, engine);
@@ -40,7 +45,7 @@ export function AdaptiveVideoPlayer(props: TrackedVideoPlayerProps) {
     return () => clearTimeout(timer);
   }, [engine, fallback, readyEngine]);
 
-  const shared = { ...props, onFatalError: fallback, onReady: ready };
+  const shared = { ...props, resumeSeconds: startPosition, onProgress: progress, onFatalError: fallback, onReady: ready };
   return <View style={styles.container}>
     {notice && <Text accessibilityRole="alert" style={styles.notice}>{notice}</Text>}
     {engine === 'native' ? <NativeTrackedVideoPlayer {...shared} key={`native:${props.mediaId}`} /> : <TrackedVideoPlayer {...shared} key={`vlc:${props.mediaId}`} />}

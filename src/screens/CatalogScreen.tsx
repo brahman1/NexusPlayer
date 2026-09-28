@@ -1,94 +1,143 @@
-import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { FlatList, Platform, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
-
+import { useFocusEffect, useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, FlatList, Image, Platform, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { MediaPoster } from '../components/MediaCards';
-import { ActionButton, ContentRail, EmptyState, LoadingSkeleton, PageHeader, Panel } from '../components/NexusUI';
+import { ActionButton, ContentRail, EmptyState, LoadingSkeleton, PageHeader } from '../components/NexusUI';
 import { Screen } from '../components/Screen';
-import { DiscoveryRepository, type CatalogCategory } from '../repositories/DiscoveryRepository';
+import { cachedOverview, CatalogRepository, type CatalogCard, type CatalogFilter, type CatalogGroup, type CatalogKind, type CatalogOverview } from '../repositories/CatalogRepository';
 import { WatchProgressRepository, type ContinueWatchingItem } from '../repositories/WatchProgressRepository';
 import { colors, layout, radii, spacing } from '../theme/tokens';
-import type { Movie, Series } from '../types/domain';
 
-const repository = new DiscoveryRepository();
+const repository = new CatalogRepository();
 const progressRepository = new WatchProgressRepository();
-type CatalogItem = Movie | Series;
+const PAGE_SIZE = 48;
+type Browse = { title: string; filter: CatalogFilter };
 
-export function CatalogScreen({ kind }: { kind: 'movie' | 'series' }) {
+function Poster({ item, width, kind }: { item: CatalogCard; width: number; kind: CatalogKind }) {
+  const router = useRouter();
+  return <MediaPoster imageUrl={item.posterUrl} meta={item.year?.toString() ?? (kind === 'series' ? 'Série' : undefined)} onPress={() => router.push({ pathname: '/media/[kind]/[id]', params: { kind, id: item.id } })} title={item.name} width={width} />;
+}
+
+const CategoryRail = memo(function CategoryRail({ group, kind, width, onBrowse }: { group: CatalogGroup; kind: CatalogKind; width: number; onBrowse: (browse: Browse) => void }) {
+  const [items, setItems] = useState<CatalogCard[]>([]);
+  const [error, setError] = useState(false);
+  useEffect(() => {
+    let active = true;
+    repository.page(kind, { categoryId: group.id }, 0, 12).then((page) => { if (active) setItems(page.items); }).catch(() => { if (active) setError(true); });
+    return () => { active = false; };
+  }, [group.id, kind]);
+  return <View style={styles.section}>
+    <View style={styles.sectionHeading}><Text style={styles.groupTitle}>{group.name} · {group.count}</Text><ActionButton label="Tout voir" variant="secondary" onPress={() => onBrowse({ title: group.name, filter: { categoryId: group.id } })} /></View>
+    {error ? <Text style={styles.error}>Impossible de charger ce rayon. « Tout voir » permet de réessayer.</Text> : <FlatList horizontal data={items} initialNumToRender={4} maxToRenderPerBatch={4} windowSize={3} keyExtractor={(item) => item.id} contentContainerStyle={styles.horizontal} renderItem={({ item }) => <Poster item={item} kind={kind} width={width} />} />}
+  </View>;
+});
+
+function CatalogGrid({ kind, filter, columns, width }: { kind: CatalogKind; filter: CatalogFilter; columns: number; width: number }) {
+  const [items, setItems] = useState<CatalogCard[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const busy = useRef(false);
+  const active = useRef(true);
+  const fetchPage = useCallback(async (offset: number) => {
+    if (busy.current) return;
+    busy.current = true;
+    setLoading(true);
+    setError(false);
+    try {
+      const page = await repository.page(kind, filter, offset, PAGE_SIZE);
+      if (!active.current) return;
+      setItems((current) => offset ? [...current, ...page.items] : page.items);
+      setTotal(page.total);
+    } catch { if (active.current) setError(true); }
+    finally { busy.current = false; if (active.current) setLoading(false); }
+  }, [filter, kind]);
+  useEffect(() => {
+    active.current = true;
+    const timer = setTimeout(() => { void fetchPage(0); }, filter.query ? 220 : 0);
+    return () => { active.current = false; clearTimeout(timer); };
+  }, [fetchPage, filter.query]);
+  return <FlatList key={columns} data={items} numColumns={columns} keyExtractor={(item) => item.id} renderItem={({ item }) => <Poster item={item} kind={kind} width={width} />} columnWrapperStyle={styles.horizontal} contentContainerStyle={styles.grid} initialNumToRender={12} maxToRenderPerBatch={8} windowSize={5}
+    ListHeaderComponent={<Text style={styles.muted}>{total} titres · {items.length} affichés</Text>}
+    ListEmptyComponent={!loading && !error ? <EmptyState title="Aucun résultat" detail="Essayez un autre titre ou une autre catégorie." /> : null}
+    onEndReached={() => { if (!error && items.length < total) void fetchPage(items.length); }} onEndReachedThreshold={0.5}
+    ListFooterComponent={error ? <ActionButton label="Réessayer" onPress={() => void fetchPage(items.length)} /> : loading ? <ActivityIndicator color={colors.accentStrong} /> : null} />;
+}
+
+export function CatalogScreen({ kind }: { kind: CatalogKind }) {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const compact = !Platform.isTV && width < 600;
-  const availableWidth = width - (Platform.isTV ? layout.tvSidebarCollapsed : 0);
   const columns = Platform.isTV ? 5 : width >= 1000 ? 4 : width >= 700 ? 3 : 2;
   const gutter = compact ? layout.phoneGutter : spacing.xl;
-  const cardWidth = Math.max(120, Math.floor((availableWidth - gutter * 2 - spacing.sm * (columns - 1)) / columns));
-  const railWidth = Platform.isTV ? 210 : compact ? 150 : 180;
-  const [items, setItems] = useState<CatalogItem[]>([]);
-  const [recent, setRecent] = useState<CatalogItem[]>([]);
-  const [categories, setCategories] = useState<CatalogCategory[]>([]);
+  const cardWidth = Math.max(80, Math.floor((width - (Platform.isTV ? layout.tvSidebarCollapsed : 0) - gutter * 2 - spacing.sm * (columns - 1)) / columns));
+  const railWidth = Platform.isTV ? 210 : compact ? 145 : 180;
+  const [overview, setOverview] = useState<CatalogOverview | null>(null);
+  const [revision, setRevision] = useState('');
+  const [favorites, setFavorites] = useState<CatalogCard[]>([]);
   const [continuing, setContinuing] = useState<ContinueWatchingItem[]>([]);
   const [query, setQuery] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [browse, setBrowse] = useState<Browse | null>(null);
+  const [error, setError] = useState(false);
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    void (async () => {
+      try {
+        const version = await repository.revision();
+        const [catalog, saved, progress] = await Promise.all([
+          cachedOverview(repository, kind, version), repository.page(kind, { favorites: true }, 0, 18), progressRepository.continueWatching(40),
+        ]);
+        if (!active) return;
+        setOverview(catalog); setRevision(version); setFavorites(saved.items);
+        setContinuing(progress.filter((entry) => entry.mediaKind === (kind === 'movie' ? 'movie' : 'episode')));
+        setError(false);
+      } catch { if (active) setError(true); }
+    })();
+    return () => { active = false; };
+  }, [kind]));
 
-  const load = useCallback(async () => {
-    const [all, newest, groups, progress] = await Promise.all([
-      kind === 'movie' ? repository.movies(2000) : repository.series(2000),
-      kind === 'movie' ? repository.recentMovies() : repository.recentSeries(),
-      repository.catalogCategories(kind, 8),
-      progressRepository.continueWatching(40),
-    ]);
-    setItems(all);
-    setRecent(newest);
-    setCategories(groups);
-    setContinuing(progress.filter((entry) => entry.mediaKind === (kind === 'movie' ? 'movie' : 'episode')));
-    setLoading(false);
-  }, [kind]);
+  const filter = useMemo(() => ({ ...browse?.filter, query: query.trim() }), [browse, query]);
+  const selectBrowse = useCallback((next: Browse) => setBrowse(next), []);
+  const showGrid = Boolean(browse || query.trim());
+  const recentTitle = kind === 'movie' ? 'Films les plus récents · année de sortie' : 'Derniers titres importés';
+  const featured = overview?.recent[0];
+  const header = <View style={styles.section}>
+    {featured && <View style={styles.hero}>
+      {featured.posterUrl && <Image accessible={false} source={{ uri: featured.posterUrl }} style={styles.heroArt} resizeMode="cover" />}
+      <LinearGradient colors={['#101621', 'rgba(23,17,55,0.88)', 'rgba(23,17,55,0.2)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
+      <View style={styles.heroCopy}><Text style={styles.eyebrow}>À DÉCOUVRIR</Text><Text style={styles.heroTitle} numberOfLines={3}>{featured.name}</Text><ActionButton label="Voir la fiche" icon="information-circle-outline" onPress={() => router.push({ pathname: '/media/[kind]/[id]', params: { kind, id: featured.id } })} /></View>
+    </View>}
+    <Text style={styles.muted}>Explorez vos sources par catégorie. Les nouveautés dépendent des informations fournies.</Text>
+    <ActionButton label="Parcourir tous les titres" icon="grid-outline" onPress={() => setBrowse({ title: 'Tous les titres', filter: {} })} />
+    {continuing.length > 0 && <ContentRail title="Continuer à regarder" data={continuing} keyExtractor={(item) => `${item.mediaKind}:${item.mediaId}`} renderItem={({ item }) => <MediaPoster imageUrl={item.imageUrl} meta={item.subtitle ?? `Reprendre à ${Math.floor(item.positionSeconds / 60)} min`} progress={item.durationSeconds > 0 ? item.positionSeconds / item.durationSeconds : 0} title={item.title} width={railWidth} onPress={() => router.push({ pathname: item.mediaKind === 'movie' ? '/watch/movie/[id]' : '/watch/episode/[id]', params: { id: item.mediaId } })} />} />}
+    {!!overview?.recent.length && <><ContentRail title={recentTitle} data={overview.recent} keyExtractor={(item) => item.id} renderItem={({ item }) => <Poster item={item} kind={kind} width={railWidth} />} /><ActionButton label="Voir tous les titres récents" variant="secondary" onPress={() => setBrowse({ title: recentTitle, filter: { recent: true } })} /></>}
+    {favorites.length > 0 && <><ContentRail title="Ma liste" data={favorites} keyExtractor={(item) => item.id} renderItem={({ item }) => <Poster item={item} kind={kind} width={railWidth} />} /><ActionButton label="Voir tous les favoris" variant="secondary" onPress={() => setBrowse({ title: 'Ma liste', filter: { favorites: true } })} /></>}
+  </View>;
 
-  useEffect(() => {
-    const timer = setTimeout(() => { void load(); }, 0);
-    return () => clearTimeout(timer);
-  }, [load]);
-
-  const results = useMemo(() => {
-    const normalized = query.trim().toLocaleLowerCase();
-    return normalized ? items.filter((item) => item.name.toLocaleLowerCase().includes(normalized)) : [];
-  }, [items, query]);
-  const favorites = useMemo(() => items.filter((item) => item.isFavorite).slice(0, 30), [items]);
-  const hero = recent[0] ?? items[0];
-  const open = (item: CatalogItem) => router.push({ pathname: '/media/[kind]/[id]', params: { kind, id: item.id } });
-  const resume = (item: ContinueWatchingItem) => router.push({ pathname: item.mediaKind === 'movie' ? '/watch/movie/[id]' : '/watch/episode/[id]', params: { id: item.mediaId } });
-  const poster = (item: CatalogItem, widthOverride = railWidth) => (
-    <MediaPoster imageUrl={item.posterUrl} meta={'releaseYear' in item ? item.releaseYear?.toString() : 'Série'} onPress={() => open(item)} title={item.name} width={widthOverride} />
-  );
-
-  return <Screen navigation><View style={[styles.container, compact && styles.containerCompact]}>
-    <PageHeader eyebrow="CATALOGUE" title={kind === 'movie' ? 'Films' : 'Séries'} subtitle={`${items.length} titres disponibles dans vos sources`} />
-    <View style={styles.searchBox}><Text style={styles.searchIcon}>⌕</Text><TextInput accessibilityLabel={`Rechercher dans les ${kind === 'movie' ? 'films' : 'séries'}`} autoCorrect={false} onChangeText={setQuery} placeholder={`Rechercher un${kind === 'movie' ? ' film' : 'e série'}…`} placeholderTextColor={colors.textMuted} returnKeyType="search" style={styles.searchInput} value={query} /></View>
-    {loading ? <LoadingSkeleton /> : items.length === 0 ? <EmptyState icon={kind === 'movie' ? 'film-outline' : 'albums-outline'} title={`Aucun${kind === 'movie' ? ' film' : 'e série'}`} detail="Connectez une source Xtream contenant ce type de catalogue." /> : query.trim() ? (
-      results.length === 0 ? <EmptyState icon="search-outline" title="Aucun résultat" detail={`Aucun titre ne correspond à « ${query.trim()} ».`} /> : <FlatList columnWrapperStyle={styles.row} contentContainerStyle={styles.grid} data={results} key={`catalog-${columns}`} keyExtractor={(item) => item.id} numColumns={columns} renderItem={({ item }) => poster(item, cardWidth)} />
-    ) : <ScrollView contentContainerStyle={styles.editorial} showsVerticalScrollIndicator={false}>
-      {hero && <Panel style={styles.hero}><View style={styles.heroCopy}><Text style={styles.heroLabel}>{kind === 'movie' ? 'À LA UNE' : 'SÉRIE À DÉCOUVRIR'}</Text><Text numberOfLines={2} style={styles.heroTitle}>{hero.name}</Text>{hero.plot && <Text numberOfLines={3} style={styles.heroPlot}>{hero.plot}</Text>}<View style={styles.heroAction}><ActionButton icon="play" label="Voir la fiche" onPress={() => open(hero)} /></View></View>{poster(hero, compact ? 130 : 180)}</Panel>}
-      {continuing.length > 0 && <ContentRail data={continuing} keyExtractor={(item) => `${item.mediaKind}:${item.mediaId}`} renderItem={({ item }) => <MediaPoster imageUrl={item.imageUrl} meta={`${item.subtitle ? `${item.subtitle} · ` : ''}Reprendre à ${Math.floor(item.positionSeconds / 60)} min`} onPress={() => resume(item)} progress={item.positionSeconds / item.durationSeconds} title={item.title} width={railWidth} />} title="Continuer à regarder" />}
-      {recent.length > 0 && <ContentRail data={recent} keyExtractor={(item) => item.id} renderItem={({ item }) => poster(item)} title={kind === 'movie' ? 'Nouvelles sorties' : 'Ajouts récents'} />}
-      {favorites.length > 0 && <ContentRail data={favorites} keyExtractor={(item) => item.id} renderItem={({ item }) => poster(item)} title="Ma liste" />}
-      {categories.map((category) => { const categoryItems = items.filter((item) => item.categoryId === category.id).slice(0, 20); return categoryItems.length ? <ContentRail data={categoryItems} key={category.id} keyExtractor={(item) => item.id} renderItem={({ item }) => poster(item)} title={category.name} /> : null; })}
-    </ScrollView>}
+  return <Screen navigation><View style={[styles.container, { paddingHorizontal: gutter }]}>
+    <PageHeader eyebrow="CATALOGUE" title={kind === 'movie' ? 'Films' : 'Séries'} subtitle={overview ? `${overview.total} titres importés · ${overview.groups.length} catégories` : 'Chargement du catalogue…'} />
+    <TextInput accessibilityLabel="Rechercher dans tout le catalogue" autoCorrect={false} placeholder="Rechercher dans tout le catalogue…" placeholderTextColor={colors.textMuted} style={styles.search} value={query} onChangeText={setQuery} />
+    {showGrid && <View style={styles.sectionHeading}><ActionButton label="Découvrir" variant="secondary" icon="arrow-back" onPress={() => { setBrowse(null); setQuery(''); }} /><Text style={styles.groupTitle}>{browse?.title ?? 'Résultats de recherche'}</Text></View>}
+    {error && <Text accessibilityRole="alert" style={styles.error}>Chargement impossible. Revenez sur cet onglet pour réessayer.</Text>}
+    {showGrid ? <CatalogGrid key={`${kind}:${revision}:${JSON.stringify(filter)}`} kind={kind} filter={filter} columns={columns} width={cardWidth} /> : !overview ? (!error && <LoadingSkeleton />) : overview.total === 0 ? <EmptyState title="Aucun titre importé" detail="Ajoutez ou actualisez une source contenant des films et séries." /> : <FlatList data={overview.groups} key={`${kind}:${revision}`} keyExtractor={(group) => group.id} ListHeaderComponent={header} contentContainerStyle={styles.editorial} initialNumToRender={2} maxToRenderPerBatch={2} windowSize={3} renderItem={({ item }) => <CategoryRail group={item} kind={kind} width={railWidth} onBrowse={selectBrowse} />} />}
   </View></Screen>;
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, gap: spacing.lg, paddingHorizontal: spacing.xl, paddingTop: spacing.xl },
-  containerCompact: { paddingHorizontal: layout.phoneGutter, paddingTop: spacing.lg },
-  searchBox: { alignItems: 'center', backgroundColor: colors.surfaceRaised, borderColor: colors.border, borderRadius: radii.pill, borderWidth: 1, flexDirection: 'row', minHeight: Platform.isTV ? layout.tvTargetHeight : layout.touchTarget, paddingHorizontal: spacing.md },
-  searchIcon: { color: colors.textMuted, fontSize: 25, marginRight: spacing.sm },
-  searchInput: { color: colors.text, flex: 1, fontSize: 16, minHeight: Platform.isTV ? layout.tvTargetHeight : layout.touchTarget, paddingVertical: 0 },
+  container: { flex: 1, gap: spacing.md, paddingTop: spacing.lg },
+  search: { color: colors.text, backgroundColor: colors.surfaceRaised, borderColor: colors.border, borderRadius: radii.md, borderWidth: 1, minHeight: 48, paddingHorizontal: spacing.md, fontSize: 16 },
   editorial: { gap: spacing.xl, paddingBottom: 112 },
-  hero: { alignItems: 'center', backgroundColor: '#15152D', flexDirection: 'row', gap: spacing.xl, justifyContent: 'space-between', overflow: 'hidden' },
-  heroCopy: { flex: 1, minWidth: 0 },
-  heroLabel: { color: colors.accentStrong, fontSize: 12, fontWeight: '900', letterSpacing: 2 },
-  heroTitle: { color: colors.text, fontSize: Platform.isTV ? 34 : 27, fontWeight: '900', marginTop: spacing.sm },
-  heroPlot: { color: colors.textMuted, fontSize: 15, lineHeight: 22, marginTop: spacing.sm },
-  heroAction: { alignSelf: 'flex-start', marginTop: spacing.md },
-  grid: { gap: spacing.sm, paddingBottom: 96 },
-  row: { gap: spacing.sm },
+  section: { gap: spacing.md },
+  sectionHeading: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm },
+  groupTitle: { color: colors.text, fontSize: Platform.isTV ? 24 : 19, fontWeight: '800', flex: 1, minWidth: 100 },
+  horizontal: { gap: spacing.sm },
+  grid: { gap: spacing.md, paddingBottom: 112 },
+  muted: { color: colors.textMuted, fontSize: 14 },
+  error: { color: colors.danger, fontSize: 14 },
+  hero: { borderRadius: radii.lg, backgroundColor: colors.surface, overflow: 'hidden', minHeight: 240 },
+  heroArt: { position: 'absolute', right: 0, top: 0, bottom: 0, width: '50%' },
+  heroCopy: { gap: spacing.md, padding: spacing.lg, width: '75%' },
+  heroTitle: { color: colors.text, fontSize: Platform.isTV ? 32 : 23, fontWeight: '900' },
+  eyebrow: { color: colors.accentStrong, fontSize: 12, fontWeight: '900', letterSpacing: 2 },
 });

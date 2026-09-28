@@ -1,5 +1,11 @@
 # Feuille de route — lecteur adaptatif NexusPlayer
 
+> État réel après le correctif Live/catalogue/seek : sélection de moteurs et
+> variantes implémentée ; qualification HTTP/Range, diagnostics détaillés et
+> mesures de vitesse sur appareils réels encore à faire. Les validations de
+> bundles et les tests simulés ne prouvent pas la vitesse ni la compatibilité
+> des flux du fournisseur. Voir le dernier correctif dans `NEXT_STEPS.md`.
+
 ## Objectif
 
 Construire une couche de lecture plus fiable qu’un lecteur IPTV à moteur unique :
