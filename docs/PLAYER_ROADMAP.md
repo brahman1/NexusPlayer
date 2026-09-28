@@ -150,3 +150,13 @@ sur au moins un appareil réel de chaque famille ciblée.
   Android TV.
 - À valider sur appareils réels : délais première image/seek, codecs atypiques,
   pistes multiples, PiP et bascule automatique avec les sources de test autorisées.
+
+### Correctifs issus du test iPhone
+
+- Suppression du préchargement des chaînes adjacentes : une seule connexion média
+  est désormais ouverte afin de respecter les limites des fournisseurs.
+- Sur Apple, les serveurs IPTV HTTP utilisent VLC et la variante TS en priorité ;
+  AVPlayer reste le fallback pour les formats compatibles.
+- Ajout d’un timeout de démarrage Live pour garantir le passage au moteur suivant.
+- Films, séries et chaînes ne relisent plus leur catalogue à chaque changement
+  d’onglet ; de nouveaux index SQLite accélèrent leur premier chargement.

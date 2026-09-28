@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 
@@ -156,13 +156,13 @@ export function ChannelListScreen() {
     return () => clearTimeout(timer);
   }, [channels.length, restoreIndex]);
 
-  useFocusEffect(useCallback(() => {
+  useEffect(() => {
     const timer = setTimeout(() => {
       setLoading(true);
       void loadChannels();
     }, search ? 200 : 0);
     return () => clearTimeout(timer);
-  }, [loadChannels, search]));
+  }, [loadChannels, search]);
 
   async function toggleFavorite(channel: Channel) {
     const favorite = !channel.isFavorite;

@@ -57,8 +57,7 @@ function PlayerAction({ autoFocus = false, label, onPress }: { autoFocus?: boole
 
 type AdjacentChannels = { previous: Channel | null; next: Channel | null };
 
-function PlayerSurface({ adjacent, channel, onAutomaticRetry, onEngineFailure, onEngineReady, onRecovered, onRetry, retryAttempt, showSettings }: {
-  adjacent: AdjacentChannels;
+function PlayerSurface({ channel, onAutomaticRetry, onEngineFailure, onEngineReady, onRecovered, onRetry, retryAttempt, showSettings }: {
   channel: Channel;
   onAutomaticRetry: () => void;
   onRecovered: () => void;
@@ -76,8 +75,6 @@ function PlayerSurface({ adjacent, channel, onAutomaticRetry, onEngineFailure, o
     };
     instance.play();
   });
-  useVideoPlayer(adjacent.previous ? sourceForChannel(adjacent.previous) : null);
-  useVideoPlayer(adjacent.next ? sourceForChannel(adjacent.next) : null);
   const { status, error } = useEvent(player, 'statusChange', { status: player.status });
   const problem = status === 'error' ? explainPlaybackError(error?.message) : null;
   const recoverable = status === 'error' && isRecoverableLiveError(error?.message);
@@ -90,6 +87,12 @@ function PlayerSurface({ adjacent, channel, onAutomaticRetry, onEngineFailure, o
   const [selectedQuality, setSelectedQuality] = useState('auto');
   const [contentFit, setContentFit] = useState(preferences.getVideoContentFit());
   const reconnectPending = recoverable && autoReconnectEnabled && retryAttempt < MAX_LIVE_RECONNECT_ATTEMPTS;
+
+  useEffect(() => {
+    if (status === 'readyToPlay' || status === 'error') return;
+    const timer = setTimeout(() => onEngineFailure?.(), 10_000);
+    return () => clearTimeout(timer);
+  }, [channel.streamUrl, onEngineFailure, status]);
 
   useEffect(() => {
     if (status === 'readyToPlay') {
@@ -167,8 +170,18 @@ function PlayerSurface({ adjacent, channel, onAutomaticRetry, onEngineFailure, o
 
 function VlcLiveSurface({ channel, onEngineFailure, onEngineReady }: { channel: Channel; onEngineFailure: () => void; onEngineReady: () => void }) {
   const [loading, setLoading] = useState(true);
+  const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const problem = error ? explainPlaybackError(error) : null;
+  useEffect(() => {
+    if (ready || error) return;
+    const timer = setTimeout(() => {
+      setLoading(false);
+      setError('Délai de connexion dépassé pour ce flux.');
+      onEngineFailure();
+    }, 25_000);
+    return () => clearTimeout(timer);
+  }, [error, onEngineFailure, ready]);
   return <View style={styles.playerBlock}>
     <View style={styles.videoFrame}>
       <LibVlcPlayerView
@@ -176,7 +189,7 @@ function VlcLiveSurface({ channel, onEngineFailure, onEngineReady }: { channel: 
         contentFit="contain"
         onBuffering={({ value }) => setLoading(value < 100)}
         onEncounteredError={({ message }) => { setLoading(false); setError(message); onEngineFailure(); }}
-        onPlaying={() => { setLoading(false); setError(null); onEngineReady(); }}
+        onPlaying={() => { setReady(true); setLoading(false); setError(null); onEngineReady(); }}
         options={['--network-caching=1000', '--http-reconnect', '--clock-jitter=0']}
         pictureInPicture={!Platform.isTV}
         source={channel.streamUrl}
@@ -207,11 +220,15 @@ export function PlayerScreen() {
   const [overlay, setOverlay] = useState<'compact' | 'guide' | 'settings' | null>('compact');
 
   const configureVariants = useCallback((variants: Channel[]) => {
-    const first = variants[0]!;
-    const key = playbackPreferenceKey(first.streamUrl, 'live', Platform.OS);
-    setChannelVariants(variants);
+    const initial = variants[0]!;
+    const initialKey = playbackPreferenceKey(initial.streamUrl, 'live', Platform.OS);
+    const selectedEngine = engineOrder(initial.streamUrl, 'live', preferences.getPlaybackEngine(initialKey), Platform.OS)[0]!;
+    const transportStream = selectedEngine === 'vlc' ? variants.find((item) => /\.ts(?:[?#]|$)/i.test(item.streamUrl)) : undefined;
+    const orderedVariants = transportStream ? [transportStream, ...variants.filter((item) => item !== transportStream)] : variants;
+    const first = orderedVariants[0]!;
+    setChannelVariants(orderedVariants);
     setVariantIndex(0);
-    setLiveEngine(engineOrder(first.streamUrl, 'live', preferences.getPlaybackEngine(key), Platform.OS)[0]!);
+    setLiveEngine(selectedEngine);
     setEngineFallbackUsed(false);
     setChannel(first);
   }, []);
@@ -324,7 +341,6 @@ export function PlayerScreen() {
       <View style={[styles.container, compact && styles.containerCompact]}>
         {channel ? liveEngine === 'native' ? (
           <PlayerSurface
-            adjacent={adjacent}
             channel={channel}
             key={`native:${channel.id}:${retryGeneration}`}
             onAutomaticRetry={retryAutomatically}

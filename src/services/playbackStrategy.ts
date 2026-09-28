@@ -18,6 +18,7 @@ export function mediaExtension(uri: string) {
 export function engineOrder(uri: string, kind: PlaybackKind, remembered?: PlaybackEngine | null, platform = ''): PlaybackEngine[] {
   const extension = mediaExtension(uri);
   if ((platform === 'ios' || platform === 'tvos') && extension && ['mkv', 'avi', 'wmv', 'flv'].includes(extension)) return ['vlc'];
+  if ((platform === 'ios' || platform === 'tvos') && /^http:\/\//i.test(uri)) return ['vlc', 'native'];
   if (remembered) return [remembered, remembered === 'native' ? 'vlc' : 'native'];
   if (extension && VLC_FIRST_EXTENSIONS.has(extension)) return ['vlc', 'native'];
   if (extension && NATIVE_FIRST_EXTENSIONS.has(extension)) return ['native', 'vlc'];

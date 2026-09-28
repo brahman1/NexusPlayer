@@ -21,6 +21,11 @@ describe('playback strategy', () => {
     expect(engineOrder('https://media.test/movie/1.avi', 'movie', null, 'tvos')).toEqual(['vlc']);
   });
 
+  it('uses VLC first for insecure IPTV endpoints on Apple devices', () => {
+    expect(engineOrder('http://media.test/live/1.m3u8', 'live', 'native', 'ios')).toEqual(['vlc', 'native']);
+    expect(engineOrder('http://media.test/movie/1.mp4', 'movie', null, 'tvos')).toEqual(['vlc', 'native']);
+  });
+
   it('builds platform-specific live variants without exposing credentials', () => {
     expect(liveMarkerCandidates('xtream://live/42.ts', 'ios')).toEqual(['xtream://live/42.m3u8', 'xtream://live/42.ts']);
     expect(liveMarkerCandidates('xtream://live/42.m3u8', 'android')).toEqual(['xtream://live/42.ts', 'xtream://live/42.m3u8']);

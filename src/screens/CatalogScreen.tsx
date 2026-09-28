@@ -1,5 +1,5 @@
-import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useRouter } from 'expo-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, Platform, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 
 import { MediaPoster } from '../components/MediaCards';
@@ -31,11 +31,10 @@ export function CatalogScreen({ kind }: { kind: 'movie' | 'series' }) {
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
-    setLoading(true);
     const [all, newest, groups, progress] = await Promise.all([
       kind === 'movie' ? repository.movies(2000) : repository.series(2000),
       kind === 'movie' ? repository.recentMovies() : repository.recentSeries(),
-      repository.catalogCategories(kind),
+      repository.catalogCategories(kind, 8),
       progressRepository.continueWatching(40),
     ]);
     setItems(all);
@@ -45,7 +44,10 @@ export function CatalogScreen({ kind }: { kind: 'movie' | 'series' }) {
     setLoading(false);
   }, [kind]);
 
-  useFocusEffect(useCallback(() => { void load(); }, [load]));
+  useEffect(() => {
+    const timer = setTimeout(() => { void load(); }, 0);
+    return () => clearTimeout(timer);
+  }, [load]);
 
   const results = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase();
@@ -69,7 +71,7 @@ export function CatalogScreen({ kind }: { kind: 'movie' | 'series' }) {
       {continuing.length > 0 && <ContentRail data={continuing} keyExtractor={(item) => `${item.mediaKind}:${item.mediaId}`} renderItem={({ item }) => <MediaPoster imageUrl={item.imageUrl} meta={`${item.subtitle ? `${item.subtitle} · ` : ''}Reprendre à ${Math.floor(item.positionSeconds / 60)} min`} onPress={() => resume(item)} progress={item.positionSeconds / item.durationSeconds} title={item.title} width={railWidth} />} title="Continuer à regarder" />}
       {recent.length > 0 && <ContentRail data={recent} keyExtractor={(item) => item.id} renderItem={({ item }) => poster(item)} title={kind === 'movie' ? 'Nouvelles sorties' : 'Ajouts récents'} />}
       {favorites.length > 0 && <ContentRail data={favorites} keyExtractor={(item) => item.id} renderItem={({ item }) => poster(item)} title="Ma liste" />}
-      {categories.map((category) => { const categoryItems = items.filter((item) => item.categoryId === category.id).slice(0, 30); return categoryItems.length ? <ContentRail data={categoryItems} key={category.id} keyExtractor={(item) => item.id} renderItem={({ item }) => poster(item)} title={category.name} /> : null; })}
+      {categories.map((category) => { const categoryItems = items.filter((item) => item.categoryId === category.id).slice(0, 20); return categoryItems.length ? <ContentRail data={categoryItems} key={category.id} keyExtractor={(item) => item.id} renderItem={({ item }) => poster(item)} title={category.name} /> : null; })}
     </ScrollView>}
   </View></Screen>;
 }
