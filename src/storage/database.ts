@@ -1,7 +1,7 @@
 import * as SQLite from 'expo-sqlite';
 
 import { categoryDisplayName, categorySortKey, channelDisplayName, episodeDisplayName, inferChannelMetadata, mediaDisplayName, naturalSortKey, type CategoryKind } from '../services/channelPresentation';
-import { DATABASE_VERSION, migrationV1, migrationV2, migrationV3, migrationV4, migrationV5, migrationV6, migrationV7, migrationV8, migrationV9, migrationV10 } from './migrations';
+import { DATABASE_VERSION, migrationV1, migrationV2, migrationV3, migrationV4, migrationV5, migrationV6, migrationV7, migrationV8, migrationV9, migrationV10, migrationV11 } from './migrations';
 import { translate } from '../i18n';
 
 const DATABASE_NAME = 'nexusplayer.db';
@@ -138,6 +138,15 @@ async function migrate(database: SQLite.SQLiteDatabase) {
       await database.execAsync(migrationV10);
       await backfillPresentationNames(database);
       await database.execAsync('PRAGMA user_version = 10');
+    });
+  }
+
+  if (currentVersion < 11) {
+    await database.withTransactionAsync(async () => {
+      await database.execAsync(migrationV11);
+      await backfillPresentationNames(database);
+      await backfillMediaPresentationNames(database);
+      await database.execAsync('PRAGMA user_version = 11');
     });
   }
 }

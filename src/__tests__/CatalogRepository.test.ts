@@ -20,6 +20,12 @@ describe('complete catalog access', () => {
     expect(filter.params).toEqual(["%100\\%\\_\\\\'%", "%100\\%\\_\\\\'%", 'group']);
     expect(filter.sql).toContain('m.category_id = ? AND m.is_favorite = 1');
   });
+  it('turns a natural-language intent into category and quality filters', () => {
+    const filter = catalogWhere({ query: 'football arabe 4K' });
+    expect(filter.sql).toContain('m.category_id IN');
+    expect(filter.sql).toContain("UPPER(m.name) LIKE '%4K%'");
+    expect(filter.params).toEqual(expect.arrayContaining(['%SPORT%', '%FOOTBALL%', '%ARABE%']));
+  });
   it('reuses overview queries and refreshes after source revisions', async () => {
     const repo = new CatalogRepository();
     const overview = jest.spyOn(repo, 'overview').mockResolvedValue({ total: 5000, groups: [], recent: [] });

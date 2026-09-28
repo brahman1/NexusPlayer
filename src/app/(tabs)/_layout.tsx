@@ -28,13 +28,13 @@ export default function TabLayout() {
     <Tabs
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarActiveTintColor: colors.text,
+        tabBarActiveTintColor: colors.emeraldStrong,
         tabBarInactiveTintColor: colors.textMuted,
         tabBarStyle: Platform.isTV
           ? { display: 'none' }
           : {
               backgroundColor: colors.surface,
-              borderTopColor: colors.border,
+              borderTopColor: colors.emeraldDeep,
               height: 58 + insets.bottom,
               paddingBottom: Math.max(insets.bottom, 6),
               paddingTop: 6,

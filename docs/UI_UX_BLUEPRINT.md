@@ -23,6 +23,8 @@ L'interface reste sombre, calme et peu décorative. La couleur sert à exprimer 
 | `textMuted` | `#9AA8BA` | Métadonnées et texte secondaire |
 | `primary` | `#6C7CFF` | Action principale et sélection |
 | `primaryStrong` | `#8D99FF` | Survol, progression et accent renforcé |
+| `emerald` | `#3DDC97` | Lumière secondaire, progression et personnalisation |
+| `emeraldDeep` | `#198A68` | Bordures actives et extrémité sombre des dégradés |
 | `success` | `#3DDC97` | Source valide et synchronisation réussie |
 | `warning` | `#FFB454` | Dégradation ou attention |
 | `danger` | `#FF647C` | Erreur et action destructive |
@@ -31,6 +33,12 @@ L'interface reste sombre, calme et peu décorative. La couleur sert à exprimer 
 Contrastes cibles : WCAG AA minimum pour tout texte, WCAG AAA pour les petits
 libellés critiques. Le focus blanc ne doit jamais être remplacé uniquement par une
 couleur d'accent.
+
+La signature visuelle Obsidian associe le violet primaire à un halo vert émeraude.
+Le violet indique l'action et la navigation ; l'émeraude indique le contenu vivant,
+la progression, la personnalisation et les états positifs. Les dégradés
+violet–émeraude sont réservés aux actions principales, aux zones hero et aux
+lumières d'arrière-plan. Ils ne doivent jamais réduire le contraste du texte.
 
 ### Palettes exploratoires
 

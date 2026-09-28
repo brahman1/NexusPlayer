@@ -14,11 +14,19 @@ export function NexusScreen({ children, fullscreen = false, navigation = false }
       <LinearGradient
         colors={fullscreen ? ['#000000', '#000000'] : gradients.screen}
         end={{ x: 1, y: 1 }}
-        locations={fullscreen ? [0, 1] : [0, 0.38, 0.72, 1]}
+        locations={fullscreen ? [0, 1] : [0, 0.28, 0.55, 0.8, 1]}
         pointerEvents="none"
         start={{ x: 0, y: 0 }}
         style={StyleSheet.absoluteFill}
       />
+      {!fullscreen && <LinearGradient
+        colors={gradients.aurora}
+        end={{ x: 0, y: 1 }}
+        locations={[0, 0.38, 0.72, 1]}
+        pointerEvents="none"
+        start={{ x: 1, y: 0 }}
+        style={StyleSheet.absoluteFill}
+      />}
       <View style={styles.row}>
         {navigation && <NexusSidebar />}
         <View style={styles.content}>{children}</View>

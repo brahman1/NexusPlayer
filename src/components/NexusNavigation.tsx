@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { type Href, usePathname, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { colors, layout, spacing } from '../theme/tokens';
+import { colors, gradients, layout, spacing } from '../theme/tokens';
 import { useI18n } from '../i18n';
 import { FocusableCard } from './FocusableCard';
 
@@ -28,7 +29,7 @@ export function NexusSidebar() {
 
   return (
     <View accessibilityLabel={tx('Navigation principale', 'Main navigation')} style={[styles.sidebar, expanded && styles.sidebarExpanded]}>
-      <View style={styles.brand}><Ionicons color={colors.text} name="play" size={26} /></View>
+      <View style={styles.brand}><LinearGradient colors={gradients.accent} end={{ x: 1, y: 1 }} start={{ x: 0, y: 0 }} style={StyleSheet.absoluteFill} /><Ionicons color={colors.text} name="play" size={26} /></View>
       <ScrollView contentContainerStyle={styles.navigationItems} onFocus={() => setExpanded(true)} onBlur={() => setExpanded(false)} showsVerticalScrollIndicator={expanded}>
       {items.map(([french, english, icon, href], index) => {
         const label = tx(french, english);
@@ -49,9 +50,9 @@ const styles = StyleSheet.create({
   sidebar: { backgroundColor: colors.surface, borderRightColor: colors.border, borderRightWidth: 1, gap: spacing.xs, paddingHorizontal: spacing.sm, paddingVertical: spacing.md, width: layout.tvSidebarCollapsed, zIndex: 20 },
   sidebarExpanded: { position: 'absolute', bottom: 0, left: 0, top: 0, width: layout.tvSidebarExpanded },
   navigationItems: { gap: spacing.xs, paddingBottom: spacing.xl },
-  brand: { alignItems: 'center', alignSelf: 'center', backgroundColor: colors.accent, borderRadius: 14, height: 48, justifyContent: 'center', marginBottom: spacing.md, width: 48 },
+  brand: { alignItems: 'center', alignSelf: 'center', backgroundColor: colors.accent, borderRadius: 14, height: 48, justifyContent: 'center', marginBottom: spacing.md, overflow: 'hidden', width: 48 },
   item: { alignItems: 'center', backgroundColor: 'transparent', borderColor: 'transparent', flexDirection: 'row', gap: spacing.md, minHeight: 58, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
-  active: { backgroundColor: colors.surfaceRaised, borderColor: colors.accent },
+  active: { backgroundColor: colors.accentSurface, borderColor: colors.emerald },
   label: { color: colors.textMuted, fontSize: 16, fontWeight: '700' },
   activeLabel: { color: colors.text },
 });

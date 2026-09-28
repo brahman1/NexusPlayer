@@ -13,6 +13,7 @@ const PLAYBACK_ENGINE_PREFIX = 'playback.engine.';
 const AUTO_SYNC_INTERVAL_KEY = 'sources.autoSyncIntervalHours';
 const CONTENT_COUNTRIES_KEY = 'content.preferredCountries';
 const CONTENT_LANGUAGES_KEY = 'content.preferredLanguages';
+const CONTENT_THEMES_KEY = 'content.preferredThemes';
 const RAW_CATEGORIES_KEY = 'content.showRawCategories';
 const CATEGORY_OVERRIDES_KEY = 'content.categoryLabelOverrides';
 
@@ -91,6 +92,8 @@ export const preferences = {
   setPreferredCountries: (values: string[]) => getStorage().set(CONTENT_COUNTRIES_KEY, JSON.stringify([...new Set(values)])),
   getPreferredLanguages: () => readStringArray(CONTENT_LANGUAGES_KEY),
   setPreferredLanguages: (values: string[]) => getStorage().set(CONTENT_LANGUAGES_KEY, JSON.stringify([...new Set(values)])),
+  getPreferredThemes: () => readStringArray(CONTENT_THEMES_KEY),
+  setPreferredThemes: (values: string[]) => getStorage().set(CONTENT_THEMES_KEY, JSON.stringify([...new Set(values)])),
   getShowRawCategories: () => getStorage().getBoolean(RAW_CATEGORIES_KEY) ?? false,
   setShowRawCategories: (value: boolean) => getStorage().set(RAW_CATEGORIES_KEY, value),
   getCategoryLabelOverrides: () => readStringRecord(CATEGORY_OVERRIDES_KEY),

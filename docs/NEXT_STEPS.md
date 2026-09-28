@@ -582,8 +582,28 @@ fonction majeure avant la validation des lots 1 à 5.
 - Ces choix sont persistants, appliqués en français et en anglais, et l'interface
   s'adapte au téléphone, à la tablette et aux téléviseurs pilotés au D-pad.
 
-Prochain lot : profils utilisateur et synchronisation sécurisée des préférences
-entre appareils, sans dépendre d'une adresse MAC.
+## Navigation par intention et facettes — lot 3 réalisé le 29 septembre 2026
+
+- Le pays n'est plus l'arborescence principale : univers, discipline, compétition,
+  langue du commentaire, pays/région et qualité sont des facettes indépendantes.
+- Le Live expose notamment Football, Basketball, Tennis, sports automobiles et
+  compétitions reconnues, puis permet de les croiser avec une langue telle que
+  l'arabe, sans dépendre du pays d'origine de la chaîne.
+- La recherche comprend des intentions bilingues comme « football arabe 4K » et
+  les applique au catalogue, aux catégories et aux métadonnées disponibles.
+- Films et Séries proposent une zone d'exploration séparant genres et pays, ainsi
+  que des rayons prioritaires transparents marqués « Pour vous ».
+- L'accueil affiche « Votre univers » à partir des centres d'intérêt, langues et
+  régions choisis. Ces préférences classent le contenu sans en masquer le reste.
+- Les préfixes et suffixes techniques sont retirés des titres visibles ; langue,
+  région et qualité deviennent des badges lisibles. Le nom fournisseur brut reste
+  intact pour la synchronisation et le diagnostic.
+- La vue brute fournisseur, le renommage local et la réinitialisation restent
+  disponibles. Aucune langue audio, popularité ou traduction absente de la source
+  n'est inventée.
+
+Prochain lot : profils utilisateur et synchronisation sécurisée des préférences,
+favoris et progressions entre appareils, sans dépendre d'une adresse MAC.
 
 ### Navigation Live et compatibilité Xtream
 

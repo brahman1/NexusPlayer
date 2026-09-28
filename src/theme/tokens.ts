@@ -7,6 +7,11 @@ export const colors = {
   textMuted: '#9AA8BA',
   accent: '#6C7CFF',
   accentStrong: '#8D99FF',
+  accentSurface: '#242B5A',
+  emerald: '#3DDC97',
+  emeraldStrong: '#63F3B5',
+  emeraldDeep: '#198A68',
+  emeraldSurface: '#123B32',
   success: '#3DDC97',
   warning: '#FFB454',
   danger: '#FF647C',
@@ -14,9 +19,12 @@ export const colors = {
 } as const;
 
 export const gradients = {
-  screen: ['#070A0F', '#0A1020', '#171137', '#070A0F'] as const,
-  hero: ['rgba(108,124,255,0.32)', 'rgba(91,63,181,0.24)', 'rgba(16,22,33,0.96)'] as const,
-  accent: ['#8D99FF', '#6C7CFF', '#745FE7'] as const,
+  screen: ['#070A0F', '#0A1020', '#171137', '#0B211D', '#070A0F'] as const,
+  aurora: ['rgba(61,220,151,0)', 'rgba(61,220,151,0.09)', 'rgba(108,124,255,0.04)', 'rgba(61,220,151,0)'] as const,
+  hero: ['rgba(108,124,255,0.40)', 'rgba(116,95,231,0.28)', 'rgba(61,220,151,0.18)', 'rgba(16,22,33,0.96)'] as const,
+  heroGlow: ['rgba(61,220,151,0)', 'rgba(61,220,151,0.22)', 'rgba(61,220,151,0)'] as const,
+  catalogHero: ['#101621', 'rgba(23,17,55,0.92)', 'rgba(18,59,50,0.58)', 'rgba(16,22,33,0.16)'] as const,
+  accent: ['#8D99FF', '#6C7CFF', '#198A68'] as const,
 } as const;
 
 export const spacing = {

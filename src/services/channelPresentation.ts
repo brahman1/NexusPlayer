@@ -141,7 +141,17 @@ function titleCaseIfShouting(value: string) {
   return value.toLocaleLowerCase().replace(/(^|[\s'’/-])\p{L}/gu, (letter) => letter.toLocaleUpperCase());
 }
 
-export function channelDisplayName(raw: string) { return peelPrefixes(raw).value || 'Chaîne sans nom'; }
+function removeTrailingTechnicalTokens(value: string) {
+  let cleaned = value;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const next = cleaned.replace(/\s*(?:[|·\-–—]\s*)?(?:\[(?:4K|FHD|FULL ?HD|HD|HEVC|H265|MULTI|UHD|VF|VOSTFR)\]|\((?:4K|FHD|FULL ?HD|HD|HEVC|H265|MULTI|UHD|VF|VOSTFR)\)|(?:4K|FHD|FULL ?HD|HD|HEVC|H265|MULTI|UHD|VF|VOSTFR))\s*$/i, '').trim();
+    if (next === cleaned) break;
+    cleaned = next;
+  }
+  return cleaned;
+}
+
+export function channelDisplayName(raw: string) { return titleCaseIfShouting(removeTrailingTechnicalTokens(peelPrefixes(raw).value)) || 'Chaîne sans nom'; }
 
 function trimMediaDecorations(value: string) {
   let cleaned = value;
@@ -152,7 +162,7 @@ function trimMediaDecorations(value: string) {
     if (!TECHNICAL_PREFIXES.has(token) && !MEDIA_PREFIXES.has(token) && !countryCodeFromToken(token)) break;
     cleaned = cleaned.slice(match[0].length);
   }
-  return cleaned.replace(/\.(?:avi|m2ts|m4v|mkv|mov|mp4|ts|wmv)$/i, '').replace(/\s*(?:[|·\-–—]\s*)?(?:\[(?:4K|FHD|HD|HEVC|MULTI|UHD|VF|VOSTFR)\]|\((?:4K|FHD|HD|HEVC|MULTI|UHD|VF|VOSTFR)\))\s*$/i, '').replace(/^[\s|•·\-–—»]+|[\s|•·\-–—«]+$/g, '').replace(/\s+/g, ' ').trim();
+  return removeTrailingTechnicalTokens(cleaned.replace(/\.(?:avi|m2ts|m4v|mkv|mov|mp4|ts|wmv)$/i, '')).replace(/^[\s|•·\-–—»]+|[\s|•·\-–—«]+$/g, '').replace(/\s+/g, ' ').trim();
 }
 
 export function mediaDisplayName(raw: string) { return titleCaseIfShouting(trimMediaDecorations(peelPrefixes(raw).value)) || 'Titre sans nom'; }

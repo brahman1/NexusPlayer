@@ -16,8 +16,8 @@ export function SettingsScreen() {
   const [textScale, setTextScale] = useState(preferences.getTextScale());
   const [subtitleSize, setSubtitleSize] = useState(preferences.getSubtitleSize());
   const [syncInterval, setSyncInterval] = useState(preferences.getAutoSyncIntervalHours());
-  const [contentPreferenceCount, setContentPreferenceCount] = useState(() => preferences.getPreferredCountries().length + preferences.getPreferredLanguages().length);
-  useFocusEffect(useCallback(() => { setContentPreferenceCount(preferences.getPreferredCountries().length + preferences.getPreferredLanguages().length); }, []));
+  const [contentPreferenceCount, setContentPreferenceCount] = useState(() => preferences.getPreferredCountries().length + preferences.getPreferredLanguages().length + preferences.getPreferredThemes().length);
+  useFocusEffect(useCallback(() => { setContentPreferenceCount(preferences.getPreferredCountries().length + preferences.getPreferredLanguages().length + preferences.getPreferredThemes().length); }, []));
   const toggleContrast = () => { const value = !contrast; setContrast(value); preferences.setHighContrast(value); };
   const toggleMotion = () => { const value = !motion; setMotion(value); preferences.setReduceMotion(value); };
   const cycleText = () => { const value = textScale >= 1.25 ? 1 : textScale + 0.25; setTextScale(value); preferences.setTextScale(value); };
@@ -36,7 +36,7 @@ export function SettingsScreen() {
   const syncLabel = syncInterval === 0 ? tx('Manuelle', 'Manual') : tx(`Toutes les ${syncInterval} h`, `Every ${syncInterval} hours`);
   const rows = [
     [tx('Langue', 'Language'), language === 'fr' ? 'Français' : 'English', toggleLanguage],
-    [tx('Pays et langues du contenu', 'Content countries & languages'), contentPreferenceCount ? tx(`${contentPreferenceCount} choix`, `${contentPreferenceCount} selected`) : tx('Tout afficher', 'Show all'), () => router.push('/(tabs)/content-preferences' as Href)],
+    [tx('Personnalisation du contenu', 'Content personalization'), contentPreferenceCount ? tx(`${contentPreferenceCount} choix`, `${contentPreferenceCount} selected`) : tx('Tout afficher', 'Show all'), () => router.push('/(tabs)/content-preferences' as Href)],
     [tx('Contraste renforcé', 'High contrast'), contrast ? tx('Activé', 'On') : tx('Désactivé', 'Off'), toggleContrast],
     [tx('Réduire les animations', 'Reduce motion'), motion ? tx('Activé', 'On') : tx('Désactivé', 'Off'), toggleMotion],
     [tx('Taille du texte', 'Text size'), `${Math.round(textScale * 100)} %`, cycleText],

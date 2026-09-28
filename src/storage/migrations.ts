@@ -1,4 +1,4 @@
-export const DATABASE_VERSION = 10;
+export const DATABASE_VERSION = 11;
 
 export const migrationV1 = `
   CREATE TABLE IF NOT EXISTS playlists (
@@ -202,4 +202,9 @@ export const migrationV10 = `
     ON channels(playlist_id, country, language, sort_name COLLATE NOCASE);
   CREATE INDEX IF NOT EXISTS idx_categories_kind_sort
     ON categories(playlist_id, kind, sort_name COLLATE NOCASE, id);
+`;
+
+export const migrationV11 = `
+  CREATE INDEX IF NOT EXISTS idx_channels_faceted_browse
+    ON channels(playlist_id, language, country, category_id, sort_name COLLATE NOCASE);
 `;

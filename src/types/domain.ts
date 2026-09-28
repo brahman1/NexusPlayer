@@ -38,6 +38,7 @@ export interface Channel {
   logoUrl: string | null;
   language: string | null;
   country: string | null;
+  quality?: '4k' | 'fhd' | 'hd' | 'sd' | null;
   isFavorite: boolean;
   lastWatchedAt: string | null;
 }

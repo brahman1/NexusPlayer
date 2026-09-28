@@ -1,23 +1,40 @@
 import { getDatabase } from '../storage/database';
 import { getAppLanguage } from '../i18n';
-import { applyCategoryLabelOverride, countryCodeFromCategoryLabel, localizeCategoryDisplayName, localizePresentationName } from '../services/channelPresentation';
+import { applyCategoryLabelOverride, countryCodeFromCategoryLabel, localizedCountryName, localizedLanguageName, localizeCategoryDisplayName, localizePresentationName } from '../services/channelPresentation';
 import { subscribeCatalogInvalidation } from '../services/catalogInvalidation';
+import { categorySearchTerms, classifyContentText, contentThemeLabel, contentTopicLabel, parseContentSearchIntent, type ContentThemeId, type ContentTopicId } from '../services/contentTaxonomy';
 
 export type CatalogKind = 'movie' | 'series';
 export type CatalogCard = { id: string; name: string; posterUrl: string | null; year: number | null };
-export type CatalogGroup = { id: string; name: string; count: number; categoryIds: string[]; preview: CatalogCard[]; preferred?: boolean };
+export type CatalogGroup = { id: string; name: string; count: number; categoryIds: string[]; preview: CatalogCard[]; preferred?: boolean; themeId?: ContentThemeId; topicId?: ContentTopicId | null; countryCode?: string | null };
+export type CatalogFacet = { id: string; name: string; count: number; categoryIds: string[] };
 export type CatalogFilter = { query?: string; categoryId?: string; categoryIds?: string[]; favorites?: boolean; recent?: boolean };
 export type CatalogPage = { items: CatalogCard[]; total: number };
-export type CatalogOverview = { total: number; groups: CatalogGroup[]; recent: CatalogCard[] };
-export type CatalogPresentationOptions = { categoryLabelOverrides?: Record<string, string>; preferredCountries?: string[]; showRawCategories?: boolean };
+export type CatalogOverview = { total: number; groups: CatalogGroup[]; recent: CatalogCard[]; themes?: CatalogFacet[]; countries?: CatalogFacet[] };
+export type CatalogPresentationOptions = { categoryLabelOverrides?: Record<string, string>; preferredCountries?: string[]; preferredThemes?: string[]; showRawCategories?: boolean };
 
 export function catalogWhere(filter: CatalogFilter) {
   const clauses: string[] = [];
   const params: string[] = [];
-  if (filter.query?.trim()) {
+  const intent = parseContentSearchIntent(filter.query?.trim() ?? '');
+  if (intent.text) {
     clauses.push("(m.name LIKE ? ESCAPE '\\' OR m.display_name LIKE ? ESCAPE '\\')");
-    const term = `%${filter.query.trim().replace(/[\\%_]/g, '\\$&')}%`;
+    const term = `%${intent.text.replace(/[\\%_]/g, '\\$&')}%`;
     params.push(term, term);
+  }
+  const intentTerms = categorySearchTerms(intent.theme, intent.topic);
+  if (intent.country) intentTerms.push(localizedCountryName(intent.country, 'fr').toUpperCase(), localizedCountryName(intent.country, 'en').toUpperCase());
+  if (intent.language) intentTerms.push(localizedLanguageName(intent.language, 'fr').toUpperCase(), localizedLanguageName(intent.language, 'en').toUpperCase());
+  if (intentTerms.length) {
+    clauses.push(`m.category_id IN (SELECT id FROM categories WHERE ${intentTerms.map(() => `(UPPER(name) LIKE ? OR UPPER(display_name) LIKE ?)`).join(' OR ')})`);
+    intentTerms.forEach((term) => params.push(`%${term}%`, `%${term}%`));
+  }
+  if (intent.quality) {
+    const checks = intent.quality === '4k' ? `(UPPER(m.name) LIKE '%4K%' OR UPPER(m.name) LIKE '%UHD%' OR UPPER(m.name) LIKE '%2160%')`
+      : intent.quality === 'fhd' ? `(UPPER(m.name) LIKE '%FHD%' OR UPPER(m.name) LIKE '%1080%')`
+        : intent.quality === 'hd' ? `((UPPER(m.name) LIKE '%HD%' AND UPPER(m.name) NOT LIKE '%FHD%' AND UPPER(m.name) NOT LIKE '%UHD%') OR UPPER(m.name) LIKE '%720%')`
+          : `(UPPER(m.name) LIKE '% SD%' OR UPPER(m.name) LIKE 'SD %' OR UPPER(m.name) LIKE '%480%')`;
+    clauses.push(checks);
   }
   if (filter.categoryId) { clauses.push('m.category_id = ?'); params.push(filter.categoryId); }
   if (filter.categoryIds?.length) {
@@ -67,11 +84,29 @@ export class CatalogRepository {
       previews.set(categoryName, group);
     }
     const preferredCountries = options.preferredCountries ?? [];
+    const preferredThemes = options.preferredThemes ?? [];
     const overrides = options.categoryLabelOverrides ?? {};
-    const groups = groupRows.map(({ categoryIdsCsv, ...group }) => ({ ...group, name: applyCategoryLabelOverride(options.showRawCategories ? group.name : localizeCategoryDisplayName(group.name, getAppLanguage()), overrides), countryCode: countryCodeFromCategoryLabel(group.name), categoryIds: categoryIdsCsv.split(',').filter(Boolean), preview: previews.get(group.name) ?? [] }))
-      .sort((left, right) => Number(preferredCountries.includes(right.countryCode ?? '')) - Number(preferredCountries.includes(left.countryCode ?? '')))
-      .map(({ countryCode, ...group }) => ({ ...group, preferred: Boolean(countryCode && preferredCountries.includes(countryCode)) }));
-    return { total: recent.total, groups, recent: recent.items };
+    const groups = groupRows.map(({ categoryIdsCsv, ...group }) => {
+      const classified = classifyContentText(group.name);
+      const themeId = classified.theme;
+      const countryCode = countryCodeFromCategoryLabel(group.name);
+      return { ...group, name: applyCategoryLabelOverride(options.showRawCategories ? group.name : localizeCategoryDisplayName(group.name, getAppLanguage()), overrides), countryCode, themeId, topicId: classified.topic, categoryIds: categoryIdsCsv.split(',').filter(Boolean), preview: previews.get(group.name) ?? [], preferred: Boolean((countryCode && preferredCountries.includes(countryCode)) || preferredThemes.includes(themeId)) };
+    }).sort((left, right) => Number(right.preferred) - Number(left.preferred));
+    const makeFacets = (selector: (group: CatalogGroup) => { id: string; name: string } | null) => {
+      const values = new Map<string, CatalogFacet>();
+      groups.forEach((group) => {
+        const selected = selector(group);
+        if (!selected) return;
+        const current = values.get(selected.id) ?? { ...selected, count: 0, categoryIds: [] };
+        current.count += group.count;
+        current.categoryIds.push(...group.categoryIds.filter((id) => !current.categoryIds.includes(id)));
+        values.set(selected.id, current);
+      });
+      return [...values.values()].sort((left, right) => right.count - left.count || left.name.localeCompare(right.name));
+    };
+    const themes = makeFacets((group) => group.topicId ? { id: group.topicId, name: contentTopicLabel(group.topicId, getAppLanguage()) } : group.themeId && group.themeId !== 'other' ? { id: group.themeId, name: contentThemeLabel(group.themeId, getAppLanguage()) } : null);
+    const countries = makeFacets((group) => group.countryCode ? { id: group.countryCode, name: localizedCountryName(group.countryCode, getAppLanguage()) } : null);
+    return { total: recent.total, groups, recent: recent.items, themes, countries };
   }
 }
 

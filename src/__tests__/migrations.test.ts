@@ -1,4 +1,4 @@
-import { DATABASE_VERSION, migrationV1, migrationV2, migrationV3, migrationV6, migrationV7, migrationV8, migrationV9, migrationV10 } from '../storage/migrations';
+import { DATABASE_VERSION, migrationV1, migrationV2, migrationV3, migrationV6, migrationV7, migrationV8, migrationV9, migrationV10, migrationV11 } from '../storage/migrations';
 
 describe('schéma de données', () => {
   it('conserve les secrets hors de SQLite', () => {
@@ -10,7 +10,7 @@ describe('schéma de données', () => {
   it('indexe les recherches Live et EPG', () => {
     expect(migrationV1).toContain('idx_channels_playlist');
     expect(migrationV1).toContain('idx_epg_now_next');
-    expect(DATABASE_VERSION).toBe(10);
+    expect(DATABASE_VERSION).toBe(11);
   });
 
   it('indexe les catalogues globaux et le tri rapide des chaînes', () => {
@@ -46,6 +46,10 @@ describe('schéma de données', () => {
   it('indexe le classement mondial par pays et langue', () => {
     expect(migrationV10).toContain('idx_channels_locale_sort');
     expect(migrationV10).toContain('idx_categories_kind_sort');
+  });
+
+  it('indexe la navigation à facettes', () => {
+    expect(migrationV11).toContain('idx_channels_faceted_browse');
   });
 
   it('indexe de manière unique les sources normalisées', () => {

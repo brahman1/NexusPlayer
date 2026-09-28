@@ -1,14 +1,14 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Image, Platform, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, FlatList, Image, Platform, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { MediaPoster } from '../components/MediaCards';
-import { ActionButton, ContentRail, EmptyState, LoadingSkeleton, PageHeader } from '../components/NexusUI';
+import { ActionButton, ContentRail, EmptyState, FilterChip, LoadingSkeleton, PageHeader, Panel } from '../components/NexusUI';
 import { Screen } from '../components/Screen';
 import { cachedOverview, CatalogRepository, staleOverview, type CatalogCard, type CatalogFilter, type CatalogGroup, type CatalogKind, type CatalogOverview } from '../repositories/CatalogRepository';
 import { WatchProgressRepository, type ContinueWatchingItem } from '../repositories/WatchProgressRepository';
 import { subscribeCatalogInvalidation } from '../services/catalogInvalidation';
-import { colors, layout, radii, spacing } from '../theme/tokens';
+import { colors, gradients, layout, radii, spacing } from '../theme/tokens';
 import { useI18n } from '../i18n';
 import { preferences } from '../storage/preferences';
 
@@ -26,7 +26,7 @@ function Poster({ item, width, kind }: { item: CatalogCard; width: number; kind:
 const CategoryRail = memo(function CategoryRail({ group, kind, width, onBrowse }: { group: CatalogGroup; kind: CatalogKind; width: number; onBrowse: (browse: Browse) => void }) {
   const { tx } = useI18n();
   return <View style={styles.section}>
-    <View style={styles.sectionHeading}><Text style={styles.groupTitle}>{group.name} · {group.count}</Text><ActionButton label={tx('Tout voir', 'See all')} variant="secondary" onPress={() => onBrowse({ title: group.name, filter: { categoryIds: group.categoryIds } })} /></View>
+    <View style={styles.sectionHeading}><View style={styles.groupHeading}><Text style={styles.groupTitle}>{group.name} · {group.count}</Text>{group.preferred && <Text style={styles.forYou}>{tx('★ POUR VOUS', '★ FOR YOU')}</Text>}</View><ActionButton label={tx('Tout voir', 'See all')} variant="secondary" onPress={() => onBrowse({ title: group.name, filter: { categoryIds: group.categoryIds } })} /></View>
     <FlatList horizontal data={group.preview} initialNumToRender={4} maxToRenderPerBatch={4} windowSize={3} keyExtractor={(item) => item.id} contentContainerStyle={styles.horizontal} renderItem={({ item }) => <Poster item={item} kind={kind} width={width} />} />
   </View>;
 });
@@ -86,7 +86,7 @@ export function CatalogScreen({ kind }: { kind: CatalogKind }) {
     let active = true;
     void (async () => {
       try {
-        const presentation = { categoryLabelOverrides: preferences.getCategoryLabelOverrides(), preferredCountries: preferences.getPreferredCountries(), showRawCategories: preferences.getShowRawCategories() };
+        const presentation = { categoryLabelOverrides: preferences.getCategoryLabelOverrides(), preferredCountries: preferences.getPreferredCountries(), preferredThemes: preferences.getPreferredThemes(), showRawCategories: preferences.getShowRawCategories() };
         const version = `${await repository.revision()}:${catalogGeneration}:${language}:${JSON.stringify(presentation)}`;
         const [catalog, saved, progress] = await Promise.all([
           cachedOverview(repository, kind, version, presentation), repository.page(kind, { favorites: true }, 0, 18), progressRepository.continueWatching(40),
@@ -109,11 +109,17 @@ export function CatalogScreen({ kind }: { kind: CatalogKind }) {
   const header = <View style={styles.section}>
     {featured && <View style={styles.hero}>
       {featured.posterUrl && <Image accessible={false} source={{ uri: featured.posterUrl }} style={styles.heroArt} resizeMode="cover" />}
-      <LinearGradient colors={['#101621', 'rgba(23,17,55,0.88)', 'rgba(23,17,55,0.2)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
+      <LinearGradient colors={gradients.catalogHero} locations={[0, 0.42, 0.76, 1]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
       <View style={styles.heroCopy}><Text style={styles.eyebrow}>{tx('À DÉCOUVRIR', 'FEATURED')}</Text><Text style={styles.heroTitle} numberOfLines={3}>{featured.name}</Text><ActionButton label={tx('Voir la fiche', 'View details')} icon="information-circle-outline" onPress={() => router.push({ pathname: '/media/[kind]/[id]', params: { kind, id: featured.id } })} /></View>
     </View>}
     <Text style={styles.muted}>{tx('Explorez vos sources par catégorie. Les nouveautés dépendent des informations fournies.', 'Explore your sources by category. New releases depend on the supplied information.')}</Text>
-    <ActionButton label={tx('Parcourir tous les titres', 'Browse all titles')} icon="grid-outline" onPress={() => setBrowse({ title: tx('Tous les titres', 'All titles'), filter: {} })} />
+    <Panel style={styles.explorer}>
+      <Text style={styles.explorerTitle}>{tx('Explorer selon vos envies', 'Explore your way')}</Text>
+      <Text style={styles.muted}>{tx('Les genres et les pays sont des filtres indépendants : aucun titre n’est enfermé dans un seul dossier.', 'Genres and countries are independent filters: no title is locked into a single folder.')}</Text>
+      {!!overview?.themes?.length && <><Text style={styles.facetLabel}>{tx('GENRES ET UNIVERS', 'GENRES & INTERESTS')}</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.facetRow}>{overview.themes.map((facet) => <FilterChip active={false} key={facet.id} label={`${facet.name} · ${facet.count}`} onPress={() => setBrowse({ title: facet.name, filter: { categoryIds: facet.categoryIds } })} />)}</ScrollView></>}
+      {!!overview?.countries?.length && <><Text style={styles.facetLabel}>{tx('PAYS ET RÉGIONS', 'COUNTRIES & REGIONS')}</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.facetRow}>{overview.countries.map((facet) => <FilterChip active={false} key={facet.id} label={`${facet.name} · ${facet.count}`} onPress={() => setBrowse({ title: facet.name, filter: { categoryIds: facet.categoryIds } })} />)}</ScrollView></>}
+      <View style={styles.explorerActions}><ActionButton label={tx('Tous les titres', 'All titles')} icon="grid-outline" onPress={() => setBrowse({ title: tx('Tous les titres', 'All titles'), filter: {} })} />{favorites.length > 0 && <ActionButton label={tx('Mes favoris', 'My favorites')} icon="heart-outline" variant="secondary" onPress={() => setBrowse({ title: tx('Ma liste', 'My list'), filter: { favorites: true } })} />}</View>
+    </Panel>
     {preferredCategoryIds.length > 0 && <ActionButton label={tx('Voir mes pays préférés', 'View my preferred countries')} icon="globe-outline" variant="secondary" onPress={() => setBrowse({ title: tx('Mes pays préférés', 'My preferred countries'), filter: { categoryIds: preferredCategoryIds } })} />}
     {continuing.length > 0 && <ContentRail title={tx('Continuer à regarder', 'Continue watching')} data={continuing} keyExtractor={(item) => `${item.mediaKind}:${item.mediaId}`} renderItem={({ item }) => <MediaPoster imageUrl={item.imageUrl} meta={item.subtitle ?? tx(`Reprendre à ${Math.floor(item.positionSeconds / 60)} min`, `Resume at ${Math.floor(item.positionSeconds / 60)} min`)} progress={item.durationSeconds > 0 ? item.positionSeconds / item.durationSeconds : 0} title={item.title} width={railWidth} onPress={() => router.push({ pathname: item.mediaKind === 'movie' ? '/watch/movie/[id]' : '/watch/episode/[id]', params: { id: item.mediaId } })} />} />}
     {!!overview?.recent.length && <><ContentRail title={recentTitle} data={overview.recent} keyExtractor={(item) => item.id} renderItem={({ item }) => <Poster item={item} kind={kind} width={railWidth} />} /><ActionButton label={tx('Voir tous les titres récents', 'See all recent titles')} variant="secondary" onPress={() => setBrowse({ title: recentTitle, filter: { recent: true } })} /></>}
@@ -122,7 +128,7 @@ export function CatalogScreen({ kind }: { kind: CatalogKind }) {
 
   return <Screen navigation><View style={[styles.container, { paddingHorizontal: gutter }]}>
     <PageHeader eyebrow={tx('CATALOGUE', 'CATALOG')} title={kind === 'movie' ? tx('Films', 'Movies') : tx('Séries', 'Series')} subtitle={overview ? tx(`${overview.total} titres importés · ${overview.groups.length} catégories`, `${overview.total} imported titles · ${overview.groups.length} categories`) : tx('Chargement du catalogue…', 'Loading catalog…')} />
-    <TextInput accessibilityLabel={tx('Rechercher dans tout le catalogue', 'Search the entire catalog')} autoCorrect={false} placeholder={tx('Rechercher dans tout le catalogue…', 'Search the entire catalog…')} placeholderTextColor={colors.textMuted} style={styles.search} value={query} onChangeText={setQuery} />
+    <TextInput accessibilityLabel={tx('Rechercher dans tout le catalogue', 'Search the entire catalog')} autoCorrect={false} placeholder={tx('Titre, genre, pays, langue ou année…', 'Title, genre, country, language or year…')} placeholderTextColor={colors.textMuted} style={styles.search} value={query} onChangeText={setQuery} />
     {showGrid && <View style={styles.sectionHeading}><ActionButton label={tx('Découvrir', 'Discover')} variant="secondary" icon="arrow-back" onPress={() => { setBrowse(null); setQuery(''); }} /><Text style={styles.groupTitle}>{browse?.title ?? tx('Résultats de recherche', 'Search results')}</Text></View>}
     {error && <Text accessibilityRole="alert" style={styles.error}>{tx('Chargement impossible. Revenez sur cet onglet pour réessayer.', 'Unable to load. Return to this tab to try again.')}</Text>}
     {showGrid ? <CatalogGrid key={`${kind}:${revision}:${JSON.stringify(filter)}`} kind={kind} filter={filter} columns={columns} width={cardWidth} /> : !overview ? (!error && <LoadingSkeleton />) : overview.total === 0 ? <EmptyState title={tx('Aucun titre importé', 'No titles imported')} detail={tx('Ajoutez ou actualisez une source contenant des films et séries.', 'Add or refresh a source containing movies and series.')} /> : <FlatList data={overview.groups} key={`${kind}:${revision}`} keyExtractor={(group) => group.id} ListHeaderComponent={header} contentContainerStyle={styles.editorial} initialNumToRender={2} maxToRenderPerBatch={2} windowSize={3} renderItem={({ item }) => <CategoryRail group={item} kind={kind} width={railWidth} onBrowse={selectBrowse} />} />}
@@ -136,6 +142,8 @@ const styles = StyleSheet.create({
   section: { gap: spacing.md },
   sectionHeading: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm },
   groupTitle: { color: colors.text, fontSize: Platform.isTV ? 24 : 19, fontWeight: '800', flex: 1, minWidth: 100 },
+  groupHeading: { flex: 1, minWidth: 120 },
+  forYou: { color: colors.emeraldStrong, fontSize: 10, fontWeight: '900', letterSpacing: 1.2, marginTop: spacing.xs },
   horizontal: { gap: spacing.sm },
   grid: { gap: spacing.md, paddingBottom: 112 },
   muted: { color: colors.textMuted, fontSize: 14 },
@@ -144,5 +152,10 @@ const styles = StyleSheet.create({
   heroArt: { position: 'absolute', right: 0, top: 0, bottom: 0, width: '50%' },
   heroCopy: { gap: spacing.md, padding: spacing.lg, width: '75%' },
   heroTitle: { color: colors.text, fontSize: Platform.isTV ? 32 : 23, fontWeight: '900' },
-  eyebrow: { color: colors.accentStrong, fontSize: 12, fontWeight: '900', letterSpacing: 2 },
+  eyebrow: { color: colors.emeraldStrong, fontSize: 12, fontWeight: '900', letterSpacing: 2 },
+  explorer: { gap: spacing.md, overflow: 'hidden' },
+  explorerTitle: { color: colors.text, fontSize: Platform.isTV ? 24 : 20, fontWeight: '900' },
+  facetLabel: { color: colors.emeraldStrong, fontSize: 11, fontWeight: '900', letterSpacing: 1.4, marginTop: spacing.sm },
+  facetRow: { gap: spacing.sm, paddingRight: spacing.lg },
+  explorerActions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
 });

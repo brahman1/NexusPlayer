@@ -2,7 +2,7 @@ import { categoryDisplayName, categorySortKey, channelDisplayName, episodeDispla
 
 describe('présentation des chaînes et catégories', () => {
   it('retire les préfixes techniques des chaînes sans modifier le nom utile', () => {
-    expect(channelDisplayName('🇫🇷 [FR] | VIP : CANAL+   SPORT UHD')).toBe('CANAL+ SPORT UHD');
+    expect(channelDisplayName('🇫🇷 [FR] | VIP : CANAL+   SPORT UHD')).toBe('Canal+ Sport');
     expect(channelDisplayName('FHD | France 2')).toBe('France 2');
   });
 
