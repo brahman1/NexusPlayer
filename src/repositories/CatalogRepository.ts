@@ -3,8 +3,8 @@ import { subscribeCatalogInvalidation } from '../services/catalogInvalidation';
 
 export type CatalogKind = 'movie' | 'series';
 export type CatalogCard = { id: string; name: string; posterUrl: string | null; year: number | null };
-export type CatalogGroup = { id: string; name: string; count: number; preview: CatalogCard[] };
-export type CatalogFilter = { query?: string; categoryId?: string; favorites?: boolean; recent?: boolean };
+export type CatalogGroup = { id: string; name: string; count: number; categoryIds: string[]; preview: CatalogCard[] };
+export type CatalogFilter = { query?: string; categoryId?: string; categoryIds?: string[]; favorites?: boolean; recent?: boolean };
 export type CatalogPage = { items: CatalogCard[]; total: number };
 export type CatalogOverview = { total: number; groups: CatalogGroup[]; recent: CatalogCard[] };
 
@@ -17,6 +17,10 @@ export function catalogWhere(filter: CatalogFilter) {
     params.push(term, term);
   }
   if (filter.categoryId) { clauses.push('m.category_id = ?'); params.push(filter.categoryId); }
+  if (filter.categoryIds?.length) {
+    clauses.push(`m.category_id IN (${filter.categoryIds.map(() => '?').join(', ')})`);
+    params.push(...filter.categoryIds);
+  }
   if (filter.favorites) clauses.push('m.is_favorite = 1');
   return { sql: clauses.length ? `WHERE ${clauses.join(' AND ')}` : '', params };
 }
@@ -43,22 +47,22 @@ export class CatalogRepository {
     const db = await getDatabase();
     const table = kind === 'movie' ? 'movies' : 'series';
     const [groupRows, previewRows, recent] = await Promise.all([
-      db.getAllAsync<Omit<CatalogGroup, 'preview'>>(`SELECT c.id, COALESCE(NULLIF(c.display_name, ''), c.name) AS name, COUNT(m.id) AS count FROM categories c JOIN ${table} m ON m.category_id = c.id WHERE c.kind = ? GROUP BY c.id ORDER BY c.position, c.sort_name COLLATE NOCASE, c.id`, kind),
-      db.getAllAsync<CatalogCard & { categoryId: string }>(`WITH ranked AS (
-        SELECT m.id, m.category_id AS categoryId, COALESCE(NULLIF(m.display_name, ''), m.name) AS name,
+      db.getAllAsync<{ id: string; name: string; count: number; categoryIdsCsv: string }>(`SELECT MIN(c.id) AS id, COALESCE(NULLIF(c.display_name, ''), c.name) AS name, COUNT(m.id) AS count, GROUP_CONCAT(DISTINCT c.id) AS categoryIdsCsv FROM categories c JOIN ${table} m ON m.category_id = c.id WHERE c.kind = ? GROUP BY COALESCE(NULLIF(c.display_name, ''), c.name) ORDER BY MIN(c.sort_name) COLLATE NOCASE, name COLLATE NOCASE`, kind),
+      db.getAllAsync<CatalogCard & { categoryName: string }>(`WITH ranked AS (
+        SELECT m.id, COALESCE(NULLIF(c.display_name, ''), c.name) AS categoryName, COALESCE(NULLIF(m.display_name, ''), m.name) AS name,
                m.poster_url AS posterUrl, ${kind === 'movie' ? 'm.release_year' : 'NULL'} AS year,
-               ROW_NUMBER() OVER (PARTITION BY m.category_id ORDER BY m.sort_name COLLATE NOCASE, m.id) AS categoryRank
-        FROM ${table} m WHERE m.category_id IS NOT NULL
-      ) SELECT id, categoryId, name, posterUrl, year FROM ranked WHERE categoryRank <= 12 ORDER BY categoryId, categoryRank`),
+               ROW_NUMBER() OVER (PARTITION BY COALESCE(NULLIF(c.display_name, ''), c.name) ORDER BY m.sort_name COLLATE NOCASE, m.id) AS categoryRank
+        FROM ${table} m JOIN categories c ON c.id = m.category_id
+      ) SELECT id, categoryName, name, posterUrl, year FROM ranked WHERE categoryRank <= 12 ORDER BY categoryName, categoryRank`),
       this.page(kind, { recent: true }, 0, 18),
     ]);
     const previews = new Map<string, CatalogCard[]>();
-    for (const { categoryId, ...item } of previewRows) {
-      const group = previews.get(categoryId) ?? [];
+    for (const { categoryName, ...item } of previewRows) {
+      const group = previews.get(categoryName) ?? [];
       group.push(item);
-      previews.set(categoryId, group);
+      previews.set(categoryName, group);
     }
-    const groups = groupRows.map((group) => ({ ...group, preview: previews.get(group.id) ?? [] }));
+    const groups = groupRows.map(({ categoryIdsCsv, ...group }) => ({ ...group, categoryIds: categoryIdsCsv.split(',').filter(Boolean), preview: previews.get(group.name) ?? [] }));
     return { total: recent.total, groups, recent: recent.items };
   }
 }

@@ -1,7 +1,7 @@
 import { getDatabase } from '../storage/database';
 import { stableId } from '../utils/ids';
 import { deduplicateXtreamCatalog, type XtreamCatalog } from '../services/xtreamClient';
-import { categoryDisplayName, categorySortKey, channelDisplayName, mediaDisplayName, naturalSortKey } from '../services/channelPresentation';
+import { categoryDisplayName, categorySortKey, channelDisplayName, inferChannelMetadata, mediaDisplayName, naturalSortKey } from '../services/channelPresentation';
 
 export async function storeXtreamCatalog(playlistId: string, name: string, endpoint: string, sourceFingerprint: string, catalog: XtreamCatalog) {
   const cleanCatalog = deduplicateXtreamCatalog(catalog);
@@ -9,15 +9,16 @@ export async function storeXtreamCatalog(playlistId: string, name: string, endpo
   const duplicate = await database.getFirstAsync<{ name: string }>('SELECT name FROM playlists WHERE source_fingerprint = ?', sourceFingerprint);
   if (duplicate) throw new Error(`Cette source existe déjà dans « ${duplicate.name} ».`);
   const category = await database.prepareAsync(`INSERT INTO categories (id, playlist_id, name, display_name, sort_name, kind, position) VALUES (?, ?, ?, ?, ?, ?, ?)`);
-  const channel = await database.prepareAsync(`INSERT INTO channels (id, playlist_id, category_id, name, display_name, sort_name, stream_url, tvg_id, tvg_name, logo_url, language, country) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)`);
+  const channel = await database.prepareAsync(`INSERT INTO channels (id, playlist_id, category_id, name, display_name, sort_name, stream_url, tvg_id, tvg_name, logo_url, language, country) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
   const movie = await database.prepareAsync(`INSERT INTO movies (id, playlist_id, category_id, name, display_name, sort_name, stream_url, poster_url, plot, release_year, external_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
   const series = await database.prepareAsync(`INSERT INTO series (id, playlist_id, category_id, name, display_name, sort_name, poster_url, plot, external_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
   const categoryIds = new Map<string, string>();
+  const categoryNames = new Map<string, string>();
   const addCategories = async (items: { category_id: string; category_name: string }[], kind: 'live' | 'movie' | 'series') => {
     for (let index = 0; index < items.length; index += 1) {
       const item = items[index]!; const id = stableId('category', `${playlistId}:${kind}:${item.category_id}`);
       const rawName = item.category_name || 'Sans catégorie';
-      categoryIds.set(`${kind}:${item.category_id}`, id); await category.executeAsync(id, playlistId, rawName, categoryDisplayName(rawName), categorySortKey(rawName), kind, index);
+      categoryIds.set(`${kind}:${item.category_id}`, id); categoryNames.set(`${kind}:${item.category_id}`, rawName); await category.executeAsync(id, playlistId, rawName, categoryDisplayName(rawName, kind), categorySortKey(rawName, kind), kind, index);
     }
   };
   try {
@@ -27,7 +28,9 @@ export async function storeXtreamCatalog(playlistId: string, name: string, endpo
       await addCategories(cleanCatalog.liveCategories, 'live'); await addCategories(cleanCatalog.vodCategories, 'movie'); await addCategories(cleanCatalog.seriesCategories, 'series');
       for (const item of cleanCatalog.liveStreams) {
         const displayName = channelDisplayName(item.name);
-        await channel.executeAsync(stableId('channel', `${playlistId}:live:${item.stream_id}`), playlistId, categoryIds.get(`live:${item.category_id}`) ?? null, item.name, displayName, naturalSortKey(displayName), `xtream://live/${item.stream_id}.${item.container_extension || 'ts'}`, item.epg_channel_id || null, item.name, item.stream_icon || null);
+        const rawCategory = categoryNames.get(`live:${item.category_id}`) ?? '';
+        const metadata = inferChannelMetadata(item.name, rawCategory);
+        await channel.executeAsync(stableId('channel', `${playlistId}:live:${item.stream_id}`), playlistId, categoryIds.get(`live:${item.category_id}`) ?? null, item.name, displayName, naturalSortKey(displayName), `xtream://live/${item.stream_id}.${item.container_extension || 'ts'}`, item.epg_channel_id || null, item.name, item.stream_icon || null, metadata.language, metadata.country);
       }
       for (const item of cleanCatalog.vodStreams) {
         const displayName = mediaDisplayName(item.name);

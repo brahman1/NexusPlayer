@@ -551,3 +551,21 @@ fonction majeure avant la validation des lots 1 à 5.
   réglable dans Réglages (manuel, 1 h, 6 h par défaut, 12 h ou 24 h).
 - Une erreur fournisseur conserve le dernier catalogue valide. Les nouvelles
   chaînes, films et séries apparaissent après la prochaine synchronisation réussie.
+
+## Classement mondial des contenus — lot 1 réalisé le 28 septembre 2026
+
+- La valeur originale du fournisseur reste intacte ; les noms et catégories
+  présentés sont calculés séparément.
+- Une taxonomie commune reconnaît les principales catégories Live et les genres
+  Films/Séries dans plusieurs langues, notamment français, anglais, turc,
+  espagnol, allemand, russe et arabe.
+- Les préfixes, drapeaux et noms de pays alimentent une détection pays/langue avec
+  niveau de confiance. Les métadonnées M3U explicites gardent toujours la priorité.
+- Les catégories fournisseur équivalentes sont fusionnées dans un seul rayon
+  canonique, sans supprimer les contenus ni empêcher la recherche par nom original.
+- À pertinence égale, le pays correspondant à la région de l'appareil passe avant
+  les autres pays ; le reste du catalogue demeure accessible.
+- La migration SQLite V10 reclasse également les sources déjà présentes.
+
+Prochain lot : écran de préférences pays/langues par profil, filtres visibles,
+corrections manuelles et conservation facultative de la vue brute du fournisseur.

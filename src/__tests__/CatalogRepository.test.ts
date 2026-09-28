@@ -38,13 +38,13 @@ describe('complete catalog access', () => {
   it('loads all category previews in one ranked query', async () => {
     const getAllAsync = jest.fn()
       .mockResolvedValueOnce([
-        { id: 'action', name: 'Action', count: 2 },
-        { id: 'drama', name: 'Drame', count: 1 },
+        { id: 'action', name: 'Action', count: 2, categoryIdsCsv: 'action,action-2' },
+        { id: 'drama', name: 'Drame', count: 1, categoryIdsCsv: 'drama' },
       ])
       .mockResolvedValueOnce([
-        { id: 'm1', categoryId: 'action', name: 'Alpha', posterUrl: null, year: 2025 },
-        { id: 'm2', categoryId: 'action', name: 'Bravo', posterUrl: null, year: 2024 },
-        { id: 'm3', categoryId: 'drama', name: 'Charlie', posterUrl: null, year: 2023 },
+        { id: 'm1', categoryName: 'Action', name: 'Alpha', posterUrl: null, year: 2025 },
+        { id: 'm2', categoryName: 'Action', name: 'Bravo', posterUrl: null, year: 2024 },
+        { id: 'm3', categoryName: 'Drame', name: 'Charlie', posterUrl: null, year: 2023 },
       ])
       .mockResolvedValueOnce([{ id: 'm1', name: 'Alpha', posterUrl: null, year: 2025 }]);
     const getFirstAsync = jest.fn().mockResolvedValue({ total: 3 });
@@ -53,6 +53,7 @@ describe('complete catalog access', () => {
     const result = await new CatalogRepository().overview('movie');
 
     expect(result.groups[0]?.preview).toHaveLength(2);
+    expect(result.groups[0]?.categoryIds).toEqual(['action', 'action-2']);
     expect(result.groups[1]?.preview[0]?.id).toBe('m3');
     expect(getAllAsync).toHaveBeenCalledTimes(3);
     expect(getAllAsync.mock.calls[1]?.[0]).toContain('ROW_NUMBER() OVER');

@@ -1,7 +1,7 @@
 import * as SQLite from 'expo-sqlite';
 
-import { categoryDisplayName, categorySortKey, channelDisplayName, episodeDisplayName, mediaDisplayName, naturalSortKey } from '../services/channelPresentation';
-import { DATABASE_VERSION, migrationV1, migrationV2, migrationV3, migrationV4, migrationV5, migrationV6, migrationV7, migrationV8, migrationV9 } from './migrations';
+import { categoryDisplayName, categorySortKey, channelDisplayName, episodeDisplayName, inferChannelMetadata, mediaDisplayName, naturalSortKey, type CategoryKind } from '../services/channelPresentation';
+import { DATABASE_VERSION, migrationV1, migrationV2, migrationV3, migrationV4, migrationV5, migrationV6, migrationV7, migrationV8, migrationV9, migrationV10 } from './migrations';
 
 const DATABASE_NAME = 'nexusplayer.db';
 
@@ -9,18 +9,19 @@ let databasePromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
 async function backfillPresentationNames(database: SQLite.SQLiteDatabase) {
   const [categories, channels] = await Promise.all([
-    database.getAllAsync<{ id: string; name: string }>('SELECT id, name FROM categories'),
-    database.getAllAsync<{ id: string; name: string }>('SELECT id, name FROM channels'),
+    database.getAllAsync<{ id: string; name: string; kind: CategoryKind }>('SELECT id, name, kind FROM categories'),
+    database.getAllAsync<{ id: string; name: string; language: string | null; country: string | null; category_name: string | null }>(`SELECT ch.id, ch.name, ch.language, ch.country, c.name AS category_name FROM channels ch LEFT JOIN categories c ON c.id = ch.category_id`),
   ]);
   const categoryStatement = await database.prepareAsync('UPDATE categories SET display_name = ?, sort_name = ? WHERE id = ?');
-  const channelStatement = await database.prepareAsync('UPDATE channels SET display_name = ?, sort_name = ? WHERE id = ?');
+  const channelStatement = await database.prepareAsync('UPDATE channels SET display_name = ?, sort_name = ?, language = ?, country = ? WHERE id = ?');
   try {
     for (const category of categories) {
-      await categoryStatement.executeAsync(categoryDisplayName(category.name), categorySortKey(category.name), category.id);
+      await categoryStatement.executeAsync(categoryDisplayName(category.name, category.kind), categorySortKey(category.name, category.kind), category.id);
     }
     for (const channel of channels) {
       const displayName = channelDisplayName(channel.name);
-      await channelStatement.executeAsync(displayName, naturalSortKey(displayName), channel.id);
+      const metadata = inferChannelMetadata(channel.name, channel.category_name ?? '', channel.language, channel.country);
+      await channelStatement.executeAsync(displayName, naturalSortKey(displayName), metadata.language, metadata.country, channel.id);
     }
   } finally {
     await categoryStatement.finalizeAsync();
@@ -128,6 +129,14 @@ async function migrate(database: SQLite.SQLiteDatabase) {
     await database.withTransactionAsync(async () => {
       await database.execAsync(migrationV9);
       await database.execAsync('PRAGMA user_version = 9');
+    });
+  }
+
+  if (currentVersion < 10) {
+    await database.withTransactionAsync(async () => {
+      await database.execAsync(migrationV10);
+      await backfillPresentationNames(database);
+      await database.execAsync('PRAGMA user_version = 10');
     });
   }
 }

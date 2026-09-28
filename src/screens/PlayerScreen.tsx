@@ -1,5 +1,6 @@
 import { useEvent, useEventListener } from 'expo';
-import { useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
+import * as ScreenOrientation from 'expo-screen-orientation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -59,8 +60,9 @@ function PlayerAction({ autoFocus = false, label, onPress }: { autoFocus?: boole
 
 type AdjacentChannels = { previous: Channel | null; next: Channel | null };
 
-function PlayerSurface({ channel, onAutomaticRetry, onEngineFailure, onEngineReady, onRecovered, onRetry, retryAttempt, showSettings }: {
+function PlayerSurface({ channel, fullscreen, onAutomaticRetry, onEngineFailure, onEngineReady, onFullscreenChange, onRecovered, onRetry, retryAttempt, showSettings }: {
   channel: Channel;
+  fullscreen: boolean;
   onAutomaticRetry: () => void;
   onRecovered: () => void;
   onRetry: () => void;
@@ -68,6 +70,7 @@ function PlayerSurface({ channel, onAutomaticRetry, onEngineFailure, onEngineRea
   showSettings: boolean;
   onEngineFailure?: () => void;
   onEngineReady?: () => void;
+  onFullscreenChange: (fullscreen: boolean) => void;
 }) {
   const player = useVideoPlayer(sourceForChannel(channel), (instance) => {
     instance.timeUpdateEventInterval = 0.5;
@@ -133,9 +136,9 @@ function PlayerSurface({ channel, onAutomaticRetry, onEngineFailure, onEngineRea
   }, [contentFit]);
 
   return (
-    <View style={styles.playerBlock}>
-      <View style={styles.videoFrame}>
-        <VideoView allowsPictureInPicture contentFit={contentFit} fullscreenOptions={{ enable: true }} nativeControls={!Platform.isTV} player={player} startsPictureInPictureAutomatically={!Platform.isTV} style={styles.video} />
+    <View style={[styles.playerBlock, fullscreen && styles.playerBlockFullscreen]}>
+      <View style={[styles.videoFrame, fullscreen && styles.videoFrameFullscreen]}>
+        <VideoView allowsPictureInPicture contentFit={contentFit} fullscreenOptions={{ enable: true }} nativeControls={!Platform.isTV} onFullscreenEnter={() => onFullscreenChange(true)} onFullscreenExit={() => onFullscreenChange(false)} player={player} startsPictureInPictureAutomatically={!Platform.isTV} style={styles.video} />
         {status === 'loading' && activity.buffering && (
           <View pointerEvents="none" style={styles.loadingOverlay}>
             <ActivityIndicator color={colors.accentStrong} size="large" />
@@ -174,7 +177,7 @@ function PlayerSurface({ channel, onAutomaticRetry, onEngineFailure, onEngineRea
   );
 }
 
-function VlcLiveSurface({ channel, onEngineFailure, onEngineReady }: { channel: Channel; onEngineFailure: () => void; onEngineReady: () => void }) {
+function VlcLiveSurface({ channel, fullscreen, onEngineFailure, onEngineReady }: { channel: Channel; fullscreen: boolean; onEngineFailure: () => void; onEngineReady: () => void }) {
   const activity = usePlaybackActivity();
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -187,8 +190,8 @@ function VlcLiveSurface({ channel, onEngineFailure, onEngineReady }: { channel: 
     }, 25_000);
     return () => clearTimeout(timer);
   }, [error, onEngineFailure, ready]);
-  return <View style={styles.playerBlock}>
-    <View style={styles.videoFrame}>
+  return <View style={[styles.playerBlock, fullscreen && styles.playerBlockFullscreen]}>
+    <View style={[styles.videoFrame, fullscreen && styles.videoFrameFullscreen]}>
       <LibVlcPlayerView
         autoplay
         contentFit="contain"
@@ -225,7 +228,23 @@ export function PlayerScreen() {
   const [retryGeneration, setRetryGeneration] = useState(0);
   const [retryAttempt, setRetryAttempt] = useState(0);
   const [programmes, setProgrammes] = useState<Awaited<ReturnType<EpgRepository['nowNext']>>>([]);
-  const [overlay, setOverlay] = useState<'compact' | 'guide' | 'settings' | null>('compact');
+  const [fullscreen, setFullscreen] = useState(false);
+
+  const toggleFullscreen = useCallback(async () => {
+    const next = !fullscreen;
+    setFullscreen(next);
+    if (Platform.isTV) return;
+    try {
+      if (next) await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+      else await ScreenOrientation.unlockAsync();
+    } catch {
+      // The video still fills the available screen when rotation locking is unavailable.
+    }
+  }, [fullscreen]);
+
+  useEffect(() => () => {
+    if (!Platform.isTV) void ScreenOrientation.unlockAsync().catch(() => undefined);
+  }, []);
 
   const configureVariants = useCallback((variants: Channel[]) => {
     const initial = variants[0]!;
@@ -339,28 +358,29 @@ export function PlayerScreen() {
     if (!Platform.isTV || event.eventKeyAction === 1) return;
     if (event.eventType === 'up') void changeChannel('previous');
     if (event.eventType === 'down') void changeChannel('next');
-    if (event.eventType === 'select') setOverlay((current) => current === null ? 'compact' : current === 'compact' ? 'guide' : null);
-    if (event.eventType === 'left') setOverlay('guide');
-    if (event.eventType === 'right') setOverlay('settings');
+    if (event.eventType === 'select') void toggleFullscreen();
   });
 
   return (
-    <Screen>
-      <View style={[styles.container, compact && styles.containerCompact]}>
+    <Screen fullscreen={fullscreen}>
+      <Stack.Screen options={{ headerShown: !fullscreen, title: channel?.displayName ?? 'Direct' }} />
+      <View style={[styles.container, compact && !fullscreen && styles.containerCompact, fullscreen && styles.containerFullscreen]}>
         {channel ? liveEngine === 'native' ? (
           <PlayerSurface
             channel={channel}
+            fullscreen={fullscreen}
             key={`native:${channel.id}:${retryGeneration}`}
             onAutomaticRetry={retryAutomatically}
             onEngineFailure={handleEngineFailure}
             onEngineReady={markRecovered}
+            onFullscreenChange={setFullscreen}
             onRecovered={markRecovered}
             onRetry={retryManually}
             retryAttempt={retryAttempt}
-            showSettings={overlay === 'settings'}
+            showSettings={false}
           />
-        ) : <VlcLiveSurface channel={channel} key={`vlc:${channel.id}:${retryGeneration}`} onEngineFailure={handleEngineFailure} onEngineReady={markRecovered} /> : !error && <ActivityIndicator color={colors.accentStrong} size="large" />}
-        {channel && overlay && (
+        ) : <VlcLiveSurface channel={channel} fullscreen={fullscreen} key={`vlc:${channel.id}:${retryGeneration}`} onEngineFailure={handleEngineFailure} onEngineReady={markRecovered} /> : !error && <ActivityIndicator color={colors.accentStrong} size="large" />}
+        {channel && !fullscreen && (
           <View style={[styles.details, compact && styles.detailsCompact]}>
             <View style={styles.channelDetails}>
               <Text numberOfLines={1} style={styles.title}>{channel.displayName}</Text>
@@ -368,17 +388,14 @@ export function PlayerScreen() {
               {programmes[1] && <Text numberOfLines={1} style={styles.next}>Ensuite · {programmes[1].title}</Text>}
               {Platform.isTV && <Text style={styles.hint}>D-pad haut/bas : changer de chaîne</Text>}
             </View>
-            <View style={[styles.actions, compact && styles.actionsCompact]}>
-              <PlayerAction autoFocus label="Chaîne précédente" onPress={() => void changeChannel('previous')} />
-              <PlayerAction label="Chaîne suivante" onPress={() => void changeChannel('next')} />
-              <PlayerAction label="Mini-guide" onPress={() => setOverlay('guide')} />
-              <PlayerAction label="Options" onPress={() => setOverlay('settings')} />
+            <View style={styles.actions}>
+              <PlayerAction autoFocus label="Plein écran" onPress={() => void toggleFullscreen()} />
             </View>
           </View>
         )}
-        {overlay === 'guide' && <View style={styles.panel}><Text style={styles.panelTitle}>Mini-guide</Text>{programmes.length ? programmes.map((item, index) => <View key={item.id} style={styles.programmeRow}><Text style={styles.programmeTime}>{index === 0 ? 'Maintenant' : 'Ensuite'}</Text><Text numberOfLines={2} style={styles.programmeTitle}>{item.title}</Text></View>) : <Text style={styles.next}>Aucun programme disponible pour cette chaîne.</Text>}</View>}
-        {switching && <Text style={styles.switching}>Changement de chaîne…</Text>}
-        {error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
+        {channel && fullscreen && <View style={styles.fullscreenAction}><PlayerAction autoFocus label="Quitter le plein écran" onPress={() => void toggleFullscreen()} /></View>}
+        {!fullscreen && switching && <Text style={styles.switching}>Changement de chaîne…</Text>}
+        {!fullscreen && error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
       </View>
     </Screen>
   );
@@ -387,8 +404,11 @@ export function PlayerScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, justifyContent: 'center', padding: spacing.lg },
   containerCompact: { justifyContent: 'flex-start', padding: spacing.sm },
+  containerFullscreen: { backgroundColor: '#000', padding: 0 },
   playerBlock: { width: '100%' },
+  playerBlockFullscreen: { flex: 1 },
   videoFrame: { aspectRatio: 16 / 9, alignSelf: 'center', backgroundColor: '#000', position: 'relative', width: Platform.isTV ? '74%' : '100%' },
+  videoFrameFullscreen: { aspectRatio: undefined, flex: 1, width: '100%' },
   video: { height: '100%', width: '100%' },
   loadingOverlay: { alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.45)', bottom: 0, gap: spacing.md, justifyContent: 'center', left: 0, position: 'absolute', right: 0, top: 0 },
   loadingText: { color: colors.text, fontSize: 16, fontWeight: '700' },
@@ -400,7 +420,7 @@ const styles = StyleSheet.create({
   next: { color: colors.textMuted, fontSize: 14, marginTop: spacing.xs },
   hint: { color: colors.textMuted, fontSize: 13, marginTop: spacing.xs },
   actions: { flexDirection: 'row', gap: spacing.sm },
-  actionsCompact: { flexWrap: 'wrap' },
+  fullscreenAction: { bottom: spacing.md, position: 'absolute', right: spacing.md, zIndex: 4 },
   action: { minHeight: 48, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   actionLabel: { color: colors.text, fontSize: 14, fontWeight: '700' },
   switching: { color: colors.accentStrong, fontSize: 14, marginTop: spacing.sm },

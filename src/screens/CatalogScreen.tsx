@@ -22,7 +22,7 @@ function Poster({ item, width, kind }: { item: CatalogCard; width: number; kind:
 
 const CategoryRail = memo(function CategoryRail({ group, kind, width, onBrowse }: { group: CatalogGroup; kind: CatalogKind; width: number; onBrowse: (browse: Browse) => void }) {
   return <View style={styles.section}>
-    <View style={styles.sectionHeading}><Text style={styles.groupTitle}>{group.name} · {group.count}</Text><ActionButton label="Tout voir" variant="secondary" onPress={() => onBrowse({ title: group.name, filter: { categoryId: group.id } })} /></View>
+    <View style={styles.sectionHeading}><Text style={styles.groupTitle}>{group.name} · {group.count}</Text><ActionButton label="Tout voir" variant="secondary" onPress={() => onBrowse({ title: group.name, filter: { categoryIds: group.categoryIds } })} /></View>
     <FlatList horizontal data={group.preview} initialNumToRender={4} maxToRenderPerBatch={4} windowSize={3} keyExtractor={(item) => item.id} contentContainerStyle={styles.horizontal} renderItem={({ item }) => <Poster item={item} kind={kind} width={width} />} />
   </View>;
 });

@@ -3,7 +3,7 @@ import type { SourceKind } from '../types/domain';
 import { stableId } from '../utils/ids';
 import type { ParsedM3uChannel } from '../services/m3uParser';
 import type { HttpValidators } from '../services/httpValidators';
-import { categoryDisplayName, categorySortKey, channelDisplayName, naturalSortKey } from '../services/channelPresentation';
+import { categoryDisplayName, categorySortKey, channelDisplayName, inferChannelMetadata, naturalSortKey } from '../services/channelPresentation';
 import {
   createPlaylistSyncReport,
   type ExistingChannelSnapshot,
@@ -80,14 +80,15 @@ async function insertChannels(
           categoryId,
           playlistId,
           channel.groupTitle,
-          categoryDisplayName(channel.groupTitle),
-          categorySortKey(channel.groupTitle),
+          categoryDisplayName(channel.groupTitle, 'live'),
+          categorySortKey(channel.groupTitle, 'live'),
           categoryIds.size - 1,
         );
       }
 
       const previous = preserved.get(channel.streamUrl);
       const displayName = channelDisplayName(channel.name);
+      const metadata = inferChannelMetadata(channel.name, channel.groupTitle, channel.language, channel.country);
       await channelStatement.executeAsync(
         stableId('channel', `${playlistId}:${channel.streamUrl}`),
         playlistId,
@@ -99,8 +100,8 @@ async function insertChannels(
         channel.tvgId,
         channel.tvgName,
         channel.logoUrl,
-        channel.language,
-        channel.country,
+        metadata.language,
+        metadata.country,
         previous?.isFavorite ? 1 : 0,
         previous?.lastWatchedAt ?? null,
       );
