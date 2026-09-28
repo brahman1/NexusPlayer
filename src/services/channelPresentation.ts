@@ -5,13 +5,20 @@ const COUNTRY_NAMES: Record<string, string> = {
   TR: 'Turquie', UK: 'Royaume-Uni', US: 'États-Unis', USA: 'États-Unis',
 };
 
-const TECHNICAL_PREFIXES = new Set(['4K', 'BACKUP', 'FHD', 'H265', 'HD', 'HEVC', 'IPTV', 'LIVE', 'NEW', 'RAW', 'SD', 'TV', 'UHD', 'VIP']);
+const TECHNICAL_PREFIXES = new Set([
+  '4K', 'BACKUP', 'FHD', 'H265', 'HD', 'HEVC', 'IPTV', 'LIVE', 'MULTI', 'NEW',
+  'RAW', 'SD', 'TV', 'UHD', 'VF', 'VIP', 'VOD', 'VOSTFR',
+]);
+
+const MEDIA_PREFIXES = new Set(['CINEMA', 'FILM', 'FILMS', 'MOVIE', 'MOVIES', 'SERIE', 'SERIES']);
 
 const CATEGORY_ALIASES: Record<string, string> = {
   ALL: 'Toutes', AUTRES: 'Autres', DOCUMENTARY: 'Documentaires', DOCUMENTARIES: 'Documentaires',
   ENTERTAINMENT: 'Divertissement', GENERAL: 'Généralistes', KIDS: 'Jeunesse', LOCAL: 'Locales',
-  MOVIES: 'Cinéma', MUSIC: 'Musique', NEWS: 'Information', OTHER: 'Autres', SPORT: 'Sport',
-  SPORTS: 'Sport', WORLD: 'International',
+  FILM: 'Films', FILMS: 'Films', MOVIE: 'Films', MOVIES: 'Films', MUSIC: 'Musique',
+  NEWS: 'Information', NEW: 'Nouveautés', NOUVEAUTES: 'Nouveautés', OTHER: 'Autres',
+  SERIE: 'Séries', SERIES: 'Séries', SPORT: 'Sport', SPORTS: 'Sport', VOD: 'Films',
+  WORLD: 'International',
 };
 
 function baseCleanup(raw: string) {
@@ -55,6 +62,42 @@ function titleCaseIfShouting(value: string) {
 export function channelDisplayName(raw: string) {
   const { value } = peelPrefixes(raw);
   return value || 'Chaîne sans nom';
+}
+
+function trimMediaDecorations(value: string) {
+  let cleaned = value;
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const match = cleaned.match(/^(?:\[([^\]]{1,16})\]|\(([^)]{1,16})\)|([\p{L}\d]{2,16}))(?:\s*[|:;•·\-–—/»]+\s*|\s+)/u);
+    if (!match) break;
+    const token = (match[1] ?? match[2] ?? match[3] ?? '').trim().toUpperCase();
+    if (!TECHNICAL_PREFIXES.has(token) && !MEDIA_PREFIXES.has(token) && !COUNTRY_NAMES[token]) break;
+    cleaned = cleaned.slice(match[0].length);
+  }
+  return cleaned
+    .replace(/\.(?:avi|m2ts|m4v|mkv|mov|mp4|ts|wmv)$/i, '')
+    .replace(/\s*(?:[|·\-–—]\s*)?(?:\[(?:4K|FHD|HD|HEVC|MULTI|UHD|VF|VOSTFR)\]|\((?:4K|FHD|HD|HEVC|MULTI|UHD|VF|VOSTFR)\))\s*$/i, '')
+    .replace(/^[\s|•·\-–—»]+|[\s|•·\-–—«]+$/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** Keeps the provider value in `name`; this value is only for display/search/sort. */
+export function mediaDisplayName(raw: string) {
+  const { value } = peelPrefixes(raw);
+  const cleaned = trimMediaDecorations(value);
+  return titleCaseIfShouting(cleaned) || 'Titre sans nom';
+}
+
+export function episodeDisplayName(raw: string, season?: number, episode?: number) {
+  const cleaned = mediaDisplayName(raw);
+  const technicalOnly = /^(?:episode|ep|e)\s*0*\d+$/i.test(cleaned);
+  if (technicalOnly && episode !== undefined) return `Épisode ${episode}`;
+  if (cleaned === 'Titre sans nom' && episode !== undefined) return `Épisode ${episode}`;
+  return cleaned || `S${season ?? 0} E${episode ?? 0}`;
+}
+
+export function mediaSortKey(raw: string) {
+  return naturalSortKey(mediaDisplayName(raw));
 }
 
 export function categoryDisplayName(raw: string) {

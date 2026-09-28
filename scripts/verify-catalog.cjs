@@ -13,7 +13,12 @@ const adapter = {
 function load(relative) {
   const code = ts.transpileModule(readFileSync(resolve(__dirname, '..', relative), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   const exports = {};
-  vm.runInNewContext(code, { exports, require: () => ({ getDatabase: async () => adapter }) });
+  vm.runInNewContext(code, {
+    exports,
+    require: (request) => request.includes('catalogInvalidation')
+      ? { subscribeCatalogInvalidation: () => () => undefined }
+      : { getDatabase: async () => adapter },
+  });
   return exports;
 }
 (async () => {

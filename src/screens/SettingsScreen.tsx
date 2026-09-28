@@ -3,7 +3,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { FocusableCard } from '../components/FocusableCard';
 import { PageHeader } from '../components/NexusUI';
 import { Screen } from '../components/Screen';
-import { preferences } from '../storage/preferences';
+import { preferences, type AutoSyncIntervalHours } from '../storage/preferences';
 import { colors, spacing } from '../theme/tokens';
 
 export function SettingsScreen() {
@@ -11,15 +11,24 @@ export function SettingsScreen() {
   const [motion, setMotion] = useState(preferences.getReduceMotion());
   const [textScale, setTextScale] = useState(preferences.getTextScale());
   const [subtitleSize, setSubtitleSize] = useState(preferences.getSubtitleSize());
+  const [syncInterval, setSyncInterval] = useState(preferences.getAutoSyncIntervalHours());
   const toggleContrast = () => { const value = !contrast; setContrast(value); preferences.setHighContrast(value); };
   const toggleMotion = () => { const value = !motion; setMotion(value); preferences.setReduceMotion(value); };
   const cycleText = () => { const value = textScale >= 1.25 ? 1 : textScale + 0.25; setTextScale(value); preferences.setTextScale(value); };
   const cycleSubtitles = () => { const value = subtitleSize >= 1.5 ? 1 : subtitleSize + 0.25; setSubtitleSize(value); preferences.setSubtitleSize(value); };
+  const cycleSyncInterval = () => {
+    const values: AutoSyncIntervalHours[] = [0, 1, 6, 12, 24];
+    const value = values[(values.indexOf(syncInterval) + 1) % values.length]!;
+    setSyncInterval(value);
+    preferences.setAutoSyncIntervalHours(value);
+  };
+  const syncLabel = syncInterval === 0 ? 'Manuelle' : `Toutes les ${syncInterval} h`;
   const rows = [
     ['Contraste renforcé', contrast ? 'Activé' : 'Désactivé', toggleContrast],
     ['Réduire les animations', motion ? 'Activé' : 'Désactivé', toggleMotion],
     ['Taille du texte', `${Math.round(textScale * 100)} %`, cycleText],
     ['Taille des sous-titres', `${Math.round(subtitleSize * 100)} %`, cycleSubtitles],
+    ['Actualisation des sources', syncLabel, cycleSyncInterval],
   ] as const;
   return <Screen navigation><ScrollView contentContainerStyle={styles.container}><PageHeader eyebrow="PROFIL" title="Réglages" subtitle="Accessibilité, lecture et confidentialité." /><View style={styles.list}>{rows.map(([title, value, action], index) => <FocusableCard accessibilityLabel={`${title}, ${value}`} autoFocus={index === 0} key={title} onPress={action} style={styles.row}><View style={styles.rowText}><Text style={styles.title}>{title}</Text><Text style={styles.detail}>Appuyez pour modifier</Text></View><Text style={styles.value}>{value}</Text></FocusableCard>)}<FocusableCard style={styles.row}><View style={styles.rowText}><Text style={styles.title}>Confidentialité</Text><Text style={styles.detail}>Identifiants protégés localement, diagnostics anonymisés</Text></View><Text style={styles.value}>Sécurisé</Text></FocusableCard></View></ScrollView></Screen>;
 }

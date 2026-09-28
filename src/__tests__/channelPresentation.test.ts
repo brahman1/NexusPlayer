@@ -1,4 +1,4 @@
-import { categoryDisplayName, categorySortKey, channelDisplayName, naturalSortKey } from '../services/channelPresentation';
+import { categoryDisplayName, categorySortKey, channelDisplayName, episodeDisplayName, mediaDisplayName, naturalSortKey } from '../services/channelPresentation';
 
 describe('présentation des chaînes et catégories', () => {
   it('retire les préfixes techniques des chaînes sans modifier le nom utile', () => {
@@ -15,5 +15,11 @@ describe('présentation des chaînes et catégories', () => {
   it('trie naturellement les numéros et place les catégories utiles en premier', () => {
     expect(naturalSortKey('France 2') < naturalSortKey('France 10')).toBe(true);
     expect(categorySortKey('NEWS') < categorySortKey('OTHER')).toBe(true);
+  });
+
+  it('nettoie les films, séries et épisodes sans perdre la valeur fournisseur', () => {
+    expect(mediaDisplayName('FR | VOD | [4K] - LE FABULEUX DESTIN D’AMÉLIE POULAIN (FHD)')).toBe('Le Fabuleux Destin D’Amélie Poulain');
+    expect(mediaDisplayName('[VIP] SERIES : THE LAST OF US')).toBe('The Last Of Us');
+    expect(episodeDisplayName('EPISODE 03', 1, 3)).toBe('Épisode 3');
   });
 });

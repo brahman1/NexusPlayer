@@ -1,4 +1,4 @@
-import { DATABASE_VERSION, migrationV1, migrationV2, migrationV3, migrationV6, migrationV7 } from '../storage/migrations';
+import { DATABASE_VERSION, migrationV1, migrationV2, migrationV3, migrationV6, migrationV7, migrationV8, migrationV9 } from '../storage/migrations';
 
 describe('schéma de données', () => {
   it('conserve les secrets hors de SQLite', () => {
@@ -10,7 +10,7 @@ describe('schéma de données', () => {
   it('indexe les recherches Live et EPG', () => {
     expect(migrationV1).toContain('idx_channels_playlist');
     expect(migrationV1).toContain('idx_epg_now_next');
-    expect(DATABASE_VERSION).toBe(7);
+    expect(DATABASE_VERSION).toBe(9);
   });
 
   it('indexe les catalogues globaux et le tri rapide des chaînes', () => {
@@ -25,8 +25,22 @@ describe('schéma de données', () => {
     expect(migrationV6).toContain('idx_channels_display_sort');
   });
 
+  it('ajoute des noms de présentation séparés pour les films, séries et épisodes', () => {
+    expect(migrationV8).toContain('ALTER TABLE movies ADD COLUMN display_name');
+    expect(migrationV8).toContain('ALTER TABLE series ADD COLUMN display_name');
+    expect(migrationV8).toContain('ALTER TABLE episodes ADD COLUMN display_name');
+    expect(migrationV8).toContain('idx_movies_display_sort');
+  });
+
   it('ne change pas le journal SQLite dans la transaction de migration', () => {
     expect(migrationV1).not.toContain('journal_mode');
+  });
+
+  it('indexe les rayons et favoris pour les grands catalogues', () => {
+    expect(migrationV9).toContain('idx_movies_category_sort');
+    expect(migrationV9).toContain('idx_series_category_sort');
+    expect(migrationV9).toContain('idx_movies_favorite_sort');
+    expect(migrationV9).toContain('idx_series_favorite_sort');
   });
 
   it('indexe de manière unique les sources normalisées', () => {

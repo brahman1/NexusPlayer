@@ -24,8 +24,8 @@ export function NativeTrackedVideoPlayer({ mediaId, mediaKind, name, nextEpisode
   const source = useMemo(() => sourceFor(uri), [uri]);
   const player = useVideoPlayer(source, (instance) => {
     instance.timeUpdateEventInterval = 1;
-    instance.seekTolerance = { toleranceBefore: 2, toleranceAfter: 2 };
-    instance.bufferOptions = { maxBufferBytes: 0, minBufferForPlayback: 1.5, preferredForwardBufferDuration: 8 };
+    instance.seekTolerance = { toleranceBefore: 5, toleranceAfter: 5 };
+    instance.bufferOptions = { maxBufferBytes: 0, minBufferForPlayback: 1.25, preferredForwardBufferDuration: 3 };
     if (resumeSeconds >= 10) instance.currentTime = resumeSeconds;
     instance.play();
   });

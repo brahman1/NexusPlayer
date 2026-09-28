@@ -1,4 +1,4 @@
-export const DATABASE_VERSION = 7;
+export const DATABASE_VERSION = 9;
 
 export const migrationV1 = `
   CREATE TABLE IF NOT EXISTS playlists (
@@ -169,4 +169,30 @@ export const migrationV7 = `
     ON series(name COLLATE NOCASE);
   CREATE INDEX IF NOT EXISTS idx_series_category
     ON series(category_id);
+`;
+
+export const migrationV8 = `
+  ALTER TABLE movies ADD COLUMN display_name TEXT NOT NULL DEFAULT '';
+  ALTER TABLE movies ADD COLUMN sort_name TEXT NOT NULL DEFAULT '';
+  ALTER TABLE series ADD COLUMN display_name TEXT NOT NULL DEFAULT '';
+  ALTER TABLE series ADD COLUMN sort_name TEXT NOT NULL DEFAULT '';
+  ALTER TABLE episodes ADD COLUMN display_name TEXT NOT NULL DEFAULT '';
+  ALTER TABLE episodes ADD COLUMN sort_name TEXT NOT NULL DEFAULT '';
+  CREATE INDEX IF NOT EXISTS idx_movies_display_sort
+    ON movies(sort_name COLLATE NOCASE);
+  CREATE INDEX IF NOT EXISTS idx_series_display_sort
+    ON series(sort_name COLLATE NOCASE);
+  CREATE INDEX IF NOT EXISTS idx_episodes_display_sort
+    ON episodes(series_id, season_number, episode_number, sort_name COLLATE NOCASE);
+`;
+
+export const migrationV9 = `
+  CREATE INDEX IF NOT EXISTS idx_movies_category_sort
+    ON movies(category_id, sort_name COLLATE NOCASE, id);
+  CREATE INDEX IF NOT EXISTS idx_series_category_sort
+    ON series(category_id, sort_name COLLATE NOCASE, id);
+  CREATE INDEX IF NOT EXISTS idx_movies_favorite_sort
+    ON movies(is_favorite, sort_name COLLATE NOCASE, id);
+  CREATE INDEX IF NOT EXISTS idx_series_favorite_sort
+    ON series(is_favorite, sort_name COLLATE NOCASE, id);
 `;

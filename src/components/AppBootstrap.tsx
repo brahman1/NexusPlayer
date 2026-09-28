@@ -1,7 +1,8 @@
 import type { PropsWithChildren } from 'react';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, AppState, type NativeEventSubscription, StyleSheet, Text, View } from 'react-native';
 
+import { runAutomaticSourceSync } from '../services/automaticSourceSync';
 import { initializeDatabase } from '../storage/database';
 import { colors, spacing } from '../theme/tokens';
 import { PrimaryButton } from './PrimaryButton';
@@ -16,7 +17,8 @@ export function AppBootstrap({ children }: PropsWithChildren) {
 
     initializeDatabase()
       .then(() => {
-        if (active) setStatus('ready');
+        if (!active) return;
+        setStatus('ready');
       })
       .catch((error: unknown) => {
         console.error('Database initialization failed', error);
@@ -27,6 +29,18 @@ export function AppBootstrap({ children }: PropsWithChildren) {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (status !== 'ready') return;
+    void runAutomaticSourceSync();
+    const appStateSubscription: NativeEventSubscription = AppState.addEventListener(
+      'change',
+      (nextState) => {
+        if (nextState === 'active') void runAutomaticSourceSync();
+      },
+    );
+    return () => appStateSubscription.remove();
+  }, [status]);
 
   const retry = async () => {
     setStatus('loading');

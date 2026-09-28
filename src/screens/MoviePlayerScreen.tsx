@@ -1,11 +1,12 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text } from 'react-native';
 import { Screen } from '../components/Screen';
 import { AdaptiveVideoPlayer } from '../components/AdaptiveVideoPlayer';
 import { DiscoveryRepository } from '../repositories/DiscoveryRepository';
 import { WatchProgressRepository } from '../repositories/WatchProgressRepository';
 import { resolveXtreamMedia } from '../services/xtreamImportService';
+import { PlaybackLaunchTrace } from '../services/playbackPerformance';
 import { colors, spacing } from '../theme/tokens';
 
 const discovery = new DiscoveryRepository();
@@ -16,18 +17,33 @@ export function MoviePlayerScreen() {
   const [media, setMedia] = useState<{ id: string; name: string; resumeSeconds: number; uri: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
+  const launchTrace = useRef<PlaybackLaunchTrace | null>(null);
   useEffect(() => {
     if (!id) return;
+    const trace = new PlaybackLaunchTrace('movie');
+    launchTrace.current = trace;
     Promise.all([discovery.movieById(id), progressRepository.get(id, 'movie')])
       .then(async ([movie, progress]) => {
         if (!movie) throw new Error('Film introuvable.');
-        setMedia({ id: movie.id, name: movie.name, resumeSeconds: progress?.positionSeconds ?? 0, uri: await resolveXtreamMedia(movie.playlistId, movie.streamUrl) });
+        trace.mark('media-ready');
+        trace.setResumeRequested((progress?.positionSeconds ?? 0) >= 10);
+        const uri = await resolveXtreamMedia(movie.playlistId, movie.streamUrl);
+        trace.mark('url-ready');
+        setMedia({ id: movie.id, name: movie.name, resumeSeconds: progress?.positionSeconds ?? 0, uri });
       })
       .catch((caught) => setError(caught instanceof Error ? caught.message : 'Lecture impossible.'));
   }, [id]);
+  const onReady = useCallback(() => launchTrace.current?.mark('engine-ready'), []);
+  const onProgress = useCallback(() => {
+    const trace = launchTrace.current;
+    if (!trace) return;
+    trace.mark('first-progress');
+    trace.report();
+    launchTrace.current = null;
+  }, []);
   return <Screen fullscreen={fullscreen}>
     <Stack.Screen options={{ headerShown: !fullscreen, title: media?.name ?? 'Film' }} />
-    {media ? <AdaptiveVideoPlayer key={media.id} mediaId={media.id} mediaKind="movie" name={media.name} onFullscreenChange={setFullscreen} resumeSeconds={media.resumeSeconds} uri={media.uri} /> : error ? <Text style={styles.error}>{error}</Text> : <ActivityIndicator color={colors.accentStrong} size="large" />}
+    {media ? <AdaptiveVideoPlayer key={media.id} mediaId={media.id} mediaKind="movie" name={media.name} onFullscreenChange={setFullscreen} onProgress={onProgress} onReady={onReady} resumeSeconds={media.resumeSeconds} uri={media.uri} /> : error ? <Text style={styles.error}>{error}</Text> : <ActivityIndicator color={colors.accentStrong} size="large" />}
   </Screen>;
 }
 

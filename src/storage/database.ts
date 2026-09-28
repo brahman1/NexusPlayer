@@ -1,7 +1,7 @@
 import * as SQLite from 'expo-sqlite';
 
-import { categoryDisplayName, categorySortKey, channelDisplayName, naturalSortKey } from '../services/channelPresentation';
-import { DATABASE_VERSION, migrationV1, migrationV2, migrationV3, migrationV4, migrationV5, migrationV6, migrationV7 } from './migrations';
+import { categoryDisplayName, categorySortKey, channelDisplayName, episodeDisplayName, mediaDisplayName, naturalSortKey } from '../services/channelPresentation';
+import { DATABASE_VERSION, migrationV1, migrationV2, migrationV3, migrationV4, migrationV5, migrationV6, migrationV7, migrationV8, migrationV9 } from './migrations';
 
 const DATABASE_NAME = 'nexusplayer.db';
 
@@ -25,6 +25,33 @@ async function backfillPresentationNames(database: SQLite.SQLiteDatabase) {
   } finally {
     await categoryStatement.finalizeAsync();
     await channelStatement.finalizeAsync();
+  }
+}
+
+async function backfillMediaPresentationNames(database: SQLite.SQLiteDatabase) {
+  const [movies, series, episodes] = await Promise.all([
+    database.getAllAsync<{ id: string; name: string }>('SELECT id, name FROM movies'),
+    database.getAllAsync<{ id: string; name: string }>('SELECT id, name FROM series'),
+    database.getAllAsync<{ id: string; name: string; season_number: number; episode_number: number }>('SELECT id, name, season_number, episode_number FROM episodes'),
+  ]);
+  const movieStatement = await database.prepareAsync('UPDATE movies SET display_name = ?, sort_name = ? WHERE id = ?');
+  const seriesStatement = await database.prepareAsync('UPDATE series SET display_name = ?, sort_name = ? WHERE id = ?');
+  const episodeStatement = await database.prepareAsync('UPDATE episodes SET display_name = ?, sort_name = ? WHERE id = ?');
+  try {
+    for (const item of movies) {
+      const name = mediaDisplayName(item.name);
+      await movieStatement.executeAsync(name, naturalSortKey(name), item.id);
+    }
+    for (const item of series) {
+      const name = mediaDisplayName(item.name);
+      await seriesStatement.executeAsync(name, naturalSortKey(name), item.id);
+    }
+    for (const item of episodes) {
+      const name = episodeDisplayName(item.name, item.season_number, item.episode_number);
+      await episodeStatement.executeAsync(name, naturalSortKey(name), item.id);
+    }
+  } finally {
+    await Promise.all([movieStatement.finalizeAsync(), seriesStatement.finalizeAsync(), episodeStatement.finalizeAsync()]);
   }
 }
 
@@ -85,6 +112,22 @@ async function migrate(database: SQLite.SQLiteDatabase) {
     await database.withTransactionAsync(async () => {
       await database.execAsync(migrationV7);
       await database.execAsync('PRAGMA user_version = 7');
+    });
+  }
+
+
+  if (currentVersion < 8) {
+    await database.withTransactionAsync(async () => {
+      await database.execAsync(migrationV8);
+      await backfillMediaPresentationNames(database);
+      await database.execAsync('PRAGMA user_version = 8');
+    });
+  }
+
+  if (currentVersion < 9) {
+    await database.withTransactionAsync(async () => {
+      await database.execAsync(migrationV9);
+      await database.execAsync('PRAGMA user_version = 9');
     });
   }
 }

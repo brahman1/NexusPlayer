@@ -12,6 +12,7 @@
       "autolinkingModuleResolution": true
     },
     "ios": {
+      "icon": "./assets/icon.png",
       "supportsTablet": true,
       "bundleIdentifier": "com.brahman1.nexusplayer",
       "infoPlist": {
@@ -22,11 +23,11 @@
       }
     },
     "android": {
+      "icon": "./assets/icon.png",
       "package": "com.nexusplayer.app",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#070A0F",
         "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false
@@ -36,6 +37,17 @@
         "@react-native-tvos/config-tv",
         {
           "androidTVRequired": false,
+          "androidTVBanner": "./assets/brand/android-tv-banner.png",
+          "androidTVIcon": "./assets/brand/android-tv-icon.png",
+          "appleTVImages": {
+            "icon": "./assets/brand/tvos/icon-1280x768.png",
+            "iconSmall": "./assets/brand/tvos/icon-400x240.png",
+            "iconSmall2x": "./assets/brand/tvos/icon-800x480.png",
+            "topShelf": "./assets/brand/tvos/top-shelf-1920x720.png",
+            "topShelf2x": "./assets/brand/tvos/top-shelf-3840x1440.png",
+            "topShelfWide": "./assets/brand/tvos/top-shelf-wide-2320x720.png",
+            "topShelfWide2x": "./assets/brand/tvos/top-shelf-wide-4640x1440.png"
+          },
           "removeFlipperOnAndroid": true,
           "tvosDeploymentTarget": "16.4"
         }
@@ -62,7 +74,16 @@
         }
       ],
       "expo-font",
-      "expo-router"
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#070A0F",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 220,
+          "resizeMode": "contain"
+        }
+      ]
     ],
     "web": {
       "favicon": "./assets/favicon.png"

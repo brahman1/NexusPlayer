@@ -47,6 +47,7 @@ export interface Movie {
   playlistId: string;
   categoryId: string | null;
   name: string;
+  displayName: string;
   streamUrl: string;
   posterUrl: string | null;
   plot: string | null;
@@ -59,6 +60,7 @@ export interface Series {
   playlistId: string;
   categoryId: string | null;
   name: string;
+  displayName: string;
   posterUrl: string | null;
   plot: string | null;
   isFavorite: boolean;
@@ -70,6 +72,7 @@ export interface Episode {
   seasonNumber: number;
   episodeNumber: number;
   name: string;
+  displayName: string;
   streamUrl: string;
   durationSeconds: number | null;
 }

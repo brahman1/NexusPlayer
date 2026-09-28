@@ -5,8 +5,9 @@ import { ActivityIndicator, FlatList, Image, Platform, StyleSheet, Text, TextInp
 import { MediaPoster } from '../components/MediaCards';
 import { ActionButton, ContentRail, EmptyState, LoadingSkeleton, PageHeader } from '../components/NexusUI';
 import { Screen } from '../components/Screen';
-import { cachedOverview, CatalogRepository, type CatalogCard, type CatalogFilter, type CatalogGroup, type CatalogKind, type CatalogOverview } from '../repositories/CatalogRepository';
+import { cachedOverview, CatalogRepository, staleOverview, type CatalogCard, type CatalogFilter, type CatalogGroup, type CatalogKind, type CatalogOverview } from '../repositories/CatalogRepository';
 import { WatchProgressRepository, type ContinueWatchingItem } from '../repositories/WatchProgressRepository';
+import { subscribeCatalogInvalidation } from '../services/catalogInvalidation';
 import { colors, layout, radii, spacing } from '../theme/tokens';
 
 const repository = new CatalogRepository();
@@ -20,16 +21,9 @@ function Poster({ item, width, kind }: { item: CatalogCard; width: number; kind:
 }
 
 const CategoryRail = memo(function CategoryRail({ group, kind, width, onBrowse }: { group: CatalogGroup; kind: CatalogKind; width: number; onBrowse: (browse: Browse) => void }) {
-  const [items, setItems] = useState<CatalogCard[]>([]);
-  const [error, setError] = useState(false);
-  useEffect(() => {
-    let active = true;
-    repository.page(kind, { categoryId: group.id }, 0, 12).then((page) => { if (active) setItems(page.items); }).catch(() => { if (active) setError(true); });
-    return () => { active = false; };
-  }, [group.id, kind]);
   return <View style={styles.section}>
     <View style={styles.sectionHeading}><Text style={styles.groupTitle}>{group.name} · {group.count}</Text><ActionButton label="Tout voir" variant="secondary" onPress={() => onBrowse({ title: group.name, filter: { categoryId: group.id } })} /></View>
-    {error ? <Text style={styles.error}>Impossible de charger ce rayon. « Tout voir » permet de réessayer.</Text> : <FlatList horizontal data={items} initialNumToRender={4} maxToRenderPerBatch={4} windowSize={3} keyExtractor={(item) => item.id} contentContainerStyle={styles.horizontal} renderItem={({ item }) => <Poster item={item} kind={kind} width={width} />} />}
+    <FlatList horizontal data={group.preview} initialNumToRender={4} maxToRenderPerBatch={4} windowSize={3} keyExtractor={(item) => item.id} contentContainerStyle={styles.horizontal} renderItem={({ item }) => <Poster item={item} kind={kind} width={width} />} />
   </View>;
 });
 
@@ -73,18 +67,20 @@ export function CatalogScreen({ kind }: { kind: CatalogKind }) {
   const gutter = compact ? layout.phoneGutter : spacing.xl;
   const cardWidth = Math.max(80, Math.floor((width - (Platform.isTV ? layout.tvSidebarCollapsed : 0) - gutter * 2 - spacing.sm * (columns - 1)) / columns));
   const railWidth = Platform.isTV ? 210 : compact ? 145 : 180;
-  const [overview, setOverview] = useState<CatalogOverview | null>(null);
+  const [overview, setOverview] = useState<CatalogOverview | null>(() => staleOverview(kind));
   const [revision, setRevision] = useState('');
   const [favorites, setFavorites] = useState<CatalogCard[]>([]);
   const [continuing, setContinuing] = useState<ContinueWatchingItem[]>([]);
   const [query, setQuery] = useState('');
   const [browse, setBrowse] = useState<Browse | null>(null);
   const [error, setError] = useState(false);
+  const [catalogGeneration, setCatalogGeneration] = useState(0);
+  useEffect(() => subscribeCatalogInvalidation(() => setCatalogGeneration((value) => value + 1)), []);
   useFocusEffect(useCallback(() => {
     let active = true;
     void (async () => {
       try {
-        const version = await repository.revision();
+        const version = `${await repository.revision()}:${catalogGeneration}`;
         const [catalog, saved, progress] = await Promise.all([
           cachedOverview(repository, kind, version), repository.page(kind, { favorites: true }, 0, 18), progressRepository.continueWatching(40),
         ]);
@@ -95,7 +91,7 @@ export function CatalogScreen({ kind }: { kind: CatalogKind }) {
       } catch { if (active) setError(true); }
     })();
     return () => { active = false; };
-  }, [kind]));
+  }, [catalogGeneration, kind]));
 
   const filter = useMemo(() => ({ ...browse?.filter, query: query.trim() }), [browse, query]);
   const selectBrowse = useCallback((next: Browse) => setBrowse(next), []);

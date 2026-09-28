@@ -1,5 +1,5 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Platform, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { ActionButton, Panel } from '../components/NexusUI';
 import { Screen } from '../components/Screen';
@@ -7,6 +7,7 @@ import { AdaptiveVideoPlayer } from '../components/AdaptiveVideoPlayer';
 import { DiscoveryRepository } from '../repositories/DiscoveryRepository';
 import { WatchProgressRepository } from '../repositories/WatchProgressRepository';
 import { resolveXtreamMedia } from '../services/xtreamImportService';
+import { PlaybackLaunchTrace } from '../services/playbackPerformance';
 import { colors, spacing } from '../theme/tokens';
 
 const discovery = new DiscoveryRepository();
@@ -24,19 +25,34 @@ export function EpisodePlayerScreen() {
   const [countdown, setCountdown] = useState<number | null>(null);
   const [finished, setFinished] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
+  const launchTrace = useRef<PlaybackLaunchTrace | null>(null);
 
   useEffect(() => {
     if (!id) return;
+    const trace = new PlaybackLaunchTrace('episode');
+    launchTrace.current = trace;
     Promise.all([discovery.episodeById(id), discovery.nextEpisode(id), progressRepository.get(id, 'episode')])
       .then(async ([episode, next, progress]) => {
         if (!episode) throw new Error('Épisode introuvable.');
+        trace.mark('media-ready');
+        trace.setResumeRequested((progress?.positionSeconds ?? 0) >= 10);
+        const uri = await resolveXtreamMedia(episode.playlist_id, episode.stream_url);
+        trace.mark('url-ready');
         setError(null);
         setCountdown(null);
         setFinished(false);
-        setMedia({ headerTitle: `${episode.series_name} · S${episode.season_number} E${episode.episode_number}`, id: episode.id, name: episode.name, next, resumeSeconds: progress?.positionSeconds ?? 0, uri: await resolveXtreamMedia(episode.playlist_id, episode.stream_url) });
+        setMedia({ headerTitle: `${episode.series_name} · S${episode.season_number} E${episode.episode_number}`, id: episode.id, name: episode.name, next, resumeSeconds: progress?.positionSeconds ?? 0, uri });
       })
       .catch((caught) => setError(caught instanceof Error ? caught.message : 'Lecture impossible.'));
   }, [id]);
+  const onReady = useCallback(() => launchTrace.current?.mark('engine-ready'), []);
+  const onProgress = useCallback(() => {
+    const trace = launchTrace.current;
+    if (!trace) return;
+    trace.mark('first-progress');
+    trace.report();
+    launchTrace.current = null;
+  }, []);
 
   useEffect(() => {
     if (countdown === null) return;
@@ -56,7 +72,7 @@ export function EpisodePlayerScreen() {
 
   return <Screen fullscreen={fullscreen}><View style={styles.screen}>
     <Stack.Screen options={{ headerShown: !fullscreen, title: media?.headerTitle ?? 'Épisode' }} />
-    {media?.id === id ? <AdaptiveVideoPlayer key={media.id} mediaId={media.id} mediaKind="episode" name={media.name} nextEpisode={media.next ? { name: media.next.name, onPress: playNext } : undefined} onEnded={onEnded} onFullscreenChange={setFullscreen} resumeSeconds={media.resumeSeconds} uri={media.uri} /> : error ? <Text style={styles.error}>{error}</Text> : <ActivityIndicator color={colors.accentStrong} size="large" />}
+    {media?.id === id ? <AdaptiveVideoPlayer key={media.id} mediaId={media.id} mediaKind="episode" name={media.name} nextEpisode={media.next ? { name: media.next.name, onPress: playNext } : undefined} onEnded={onEnded} onFullscreenChange={setFullscreen} onProgress={onProgress} onReady={onReady} resumeSeconds={media.resumeSeconds} uri={media.uri} /> : error ? <Text style={styles.error}>{error}</Text> : <ActivityIndicator color={colors.accentStrong} size="large" />}
     {finished && media?.id === id && <Panel style={[styles.nextPanel, compact && styles.nextPanelCompact]}>{media.next ? <><Text style={styles.nextTitle}>Épisode suivant dans {countdown ?? 0} s</Text><Text numberOfLines={2} style={styles.nextName}>{media.next.name}</Text><View style={styles.actions}><ActionButton autoFocus icon="play" label="Lire maintenant" onPress={playNext} /><ActionButton icon="close" label="Annuler" onPress={() => { setCountdown(null); setFinished(false); }} variant="secondary" /></View></> : <Text style={styles.nextTitle}>Série terminée</Text>}</Panel>}
   </View></Screen>;
 }

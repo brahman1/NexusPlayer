@@ -1,7 +1,7 @@
 import { getDatabase } from '../storage/database';
 import { deduplicateXtreamCatalog, type XtreamCatalog, type XtreamEpisode } from '../services/xtreamClient';
 import { createEntitySyncReport, type SyncEntity, type XtreamSyncReport } from '../services/xtreamSync';
-import { categoryDisplayName, categorySortKey, channelDisplayName, naturalSortKey } from '../services/channelPresentation';
+import { categoryDisplayName, categorySortKey, channelDisplayName, episodeDisplayName, mediaDisplayName, naturalSortKey } from '../services/channelPresentation';
 import { stableId } from '../utils/ids';
 
 type CategoryRecord = SyncEntity & { name: string; kind: 'live' | 'movie' | 'series'; position: number };
@@ -80,9 +80,9 @@ export async function syncXtreamCatalog(playlistId: string, catalog: XtreamCatal
   const statements = await Promise.all([
     database.prepareAsync(`INSERT INTO categories (id, playlist_id, name, display_name, sort_name, kind, position) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET name=excluded.name, display_name=excluded.display_name, sort_name=excluded.sort_name, kind=excluded.kind, position=excluded.position`),
     database.prepareAsync(`INSERT INTO channels (id, playlist_id, category_id, name, display_name, sort_name, stream_url, tvg_id, tvg_name, logo_url, language, country) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL) ON CONFLICT(id) DO UPDATE SET category_id=excluded.category_id, name=excluded.name, display_name=excluded.display_name, sort_name=excluded.sort_name, stream_url=excluded.stream_url, tvg_id=excluded.tvg_id, tvg_name=excluded.tvg_name, logo_url=excluded.logo_url`),
-    database.prepareAsync(`INSERT INTO movies (id, playlist_id, category_id, name, stream_url, poster_url, plot, release_year, external_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET category_id=excluded.category_id, name=excluded.name, stream_url=excluded.stream_url, poster_url=excluded.poster_url, plot=excluded.plot, release_year=excluded.release_year, external_id=excluded.external_id`),
-    database.prepareAsync(`INSERT INTO series (id, playlist_id, category_id, name, poster_url, plot, external_id) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET category_id=excluded.category_id, name=excluded.name, poster_url=excluded.poster_url, plot=excluded.plot, external_id=excluded.external_id`),
-    database.prepareAsync(`INSERT INTO episodes (id, series_id, season_number, episode_number, name, stream_url, duration_seconds) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET season_number=excluded.season_number, episode_number=excluded.episode_number, name=excluded.name, stream_url=excluded.stream_url, duration_seconds=excluded.duration_seconds`),
+    database.prepareAsync(`INSERT INTO movies (id, playlist_id, category_id, name, display_name, sort_name, stream_url, poster_url, plot, release_year, external_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET category_id=excluded.category_id, name=excluded.name, display_name=excluded.display_name, sort_name=excluded.sort_name, stream_url=excluded.stream_url, poster_url=excluded.poster_url, plot=excluded.plot, release_year=excluded.release_year, external_id=excluded.external_id`),
+    database.prepareAsync(`INSERT INTO series (id, playlist_id, category_id, name, display_name, sort_name, poster_url, plot, external_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET category_id=excluded.category_id, name=excluded.name, display_name=excluded.display_name, sort_name=excluded.sort_name, poster_url=excluded.poster_url, plot=excluded.plot, external_id=excluded.external_id`),
+    database.prepareAsync(`INSERT INTO episodes (id, series_id, season_number, episode_number, name, display_name, sort_name, stream_url, duration_seconds) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET season_number=excluded.season_number, episode_number=excluded.episode_number, name=excluded.name, display_name=excluded.display_name, sort_name=excluded.sort_name, stream_url=excluded.stream_url, duration_seconds=excluded.duration_seconds`),
   ]);
   try {
     await database.withTransactionAsync(async () => {
@@ -91,9 +91,18 @@ export async function syncXtreamCatalog(playlistId: string, catalog: XtreamCatal
         const displayName = channelDisplayName(item.name);
         await statements[1]!.executeAsync(item.id, playlistId, item.categoryId, item.name, displayName, naturalSortKey(displayName), item.marker, item.tvgId, item.name, item.logoUrl);
       }
-      for (const item of movies) await statements[2]!.executeAsync(item.id, playlistId, item.categoryId, item.name, item.marker, item.posterUrl, item.plot, item.releaseYear, item.externalId);
-      for (const item of series) await statements[3]!.executeAsync(item.id, playlistId, item.categoryId, item.name, item.posterUrl, item.plot, item.externalId);
-      for (const item of episodes) await statements[4]!.executeAsync(item.id, item.seriesId, item.season, item.episode, item.name, item.marker, item.duration);
+      for (const item of movies) {
+        const displayName = mediaDisplayName(item.name);
+        await statements[2]!.executeAsync(item.id, playlistId, item.categoryId, item.name, displayName, naturalSortKey(displayName), item.marker, item.posterUrl, item.plot, item.releaseYear, item.externalId);
+      }
+      for (const item of series) {
+        const displayName = mediaDisplayName(item.name);
+        await statements[3]!.executeAsync(item.id, playlistId, item.categoryId, item.name, displayName, naturalSortKey(displayName), item.posterUrl, item.plot, item.externalId);
+      }
+      for (const item of episodes) {
+        const displayName = episodeDisplayName(item.name, item.season, item.episode);
+        await statements[4]!.executeAsync(item.id, item.seriesId, item.season, item.episode, item.name, displayName, naturalSortKey(displayName), item.marker, item.duration);
+      }
       await deleteMissing(database, 'channels', playlistId, snapshots.channels, new Set(channels.map((x) => x.id)));
       await deleteMissing(database, 'movies', playlistId, snapshots.movies, new Set(movies.map((x) => x.id)));
       await deleteMissing(database, 'series', playlistId, snapshots.series, new Set(series.map((x) => x.id)));

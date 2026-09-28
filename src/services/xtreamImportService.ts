@@ -7,9 +7,12 @@ import { createId, stableId } from '../utils/ids';
 import { fetchXtreamCatalog, fetchXtreamSeriesEpisodes, normalizeXtreamServer, xtreamMediaUrl } from './xtreamClient';
 import { liveMarkerCandidates } from './playbackStrategy';
 import type { Channel, Playlist, XtreamCredentials } from '../types/domain';
+import { episodeDisplayName, naturalSortKey } from './channelPresentation';
 
 type XtreamAccess = { endpoint: string; credentials: XtreamCredentials };
 const xtreamAccessCache = new Map<string, Promise<XtreamAccess>>();
+const resolvedMediaCache = new Map<string, { expiresAt: number; value: Promise<string> }>();
+const RESOLVED_MEDIA_TTL_MS = 5 * 60 * 1000;
 
 function cacheXtreamAccess(playlistId: string, endpoint: string, credentials: XtreamCredentials) {
   xtreamAccessCache.set(playlistId, Promise.resolve({ endpoint, credentials }));
@@ -83,8 +86,22 @@ export function compatibleLiveMarker(marker: string, platform: string) {
 
 export async function resolveXtreamMedia(playlistId: string, marker: string) {
   if (!marker.startsWith('xtream://')) return marker;
-  const { endpoint, credentials } = await loadXtreamAccess(playlistId);
-  return xtreamMediaUrl(endpoint, credentials, marker);
+  const key = `${playlistId}\0${marker}`;
+  const cached = resolvedMediaCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+  const value = loadXtreamAccess(playlistId)
+    .then(({ endpoint, credentials }) => xtreamMediaUrl(endpoint, credentials, marker))
+    .catch((error) => {
+      resolvedMediaCache.delete(key);
+      throw error;
+    });
+  resolvedMediaCache.set(key, { expiresAt: Date.now() + RESOLVED_MEDIA_TTL_MS, value });
+  if (resolvedMediaCache.size > 32) resolvedMediaCache.delete(resolvedMediaCache.keys().next().value!);
+  return value;
+}
+
+export function prefetchXtreamMedia(playlistId: string, marker: string) {
+  return resolveXtreamMedia(playlistId, marker).then(() => undefined);
 }
 
 export async function syncXtreamSeriesEpisodes(seriesId: string) {
@@ -105,10 +122,15 @@ export async function syncXtreamSeriesEpisodes(seriesId: string) {
   await database.withTransactionAsync(async () => {
     await database.runAsync('DELETE FROM episodes WHERE series_id = ?', seriesId);
     for (const episode of episodes) {
-      await database.runAsync(`INSERT INTO episodes (id, series_id, season_number, episode_number, name, stream_url, duration_seconds) VALUES (?, ?, ?, ?, ?, ?, ?)`, stableId('episode', `${seriesId}:${episode.id}`), seriesId, episode.season, episode.episode, episode.name, `xtream://series/${episode.id}.${episode.extension}`, episode.durationSeconds);
+      const displayName = episodeDisplayName(episode.name, episode.season, episode.episode);
+      await database.runAsync(`INSERT INTO episodes (id, series_id, season_number, episode_number, name, display_name, sort_name, stream_url, duration_seconds) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, stableId('episode', `${seriesId}:${episode.id}`), seriesId, episode.season, episode.episode, episode.name, displayName, naturalSortKey(displayName), `xtream://series/${episode.id}.${episode.extension}`, episode.durationSeconds);
     }
   });
   return episodes.length;
 }
 
-export async function removeXtreamCredentials(playlistId: string) { xtreamAccessCache.delete(playlistId); await deleteCredentials(playlistId); }
+export async function removeXtreamCredentials(playlistId: string) {
+  xtreamAccessCache.delete(playlistId);
+  for (const key of resolvedMediaCache.keys()) if (key.startsWith(`${playlistId}\0`)) resolvedMediaCache.delete(key);
+  await deleteCredentials(playlistId);
+}

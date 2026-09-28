@@ -1,5 +1,45 @@
 # Reprise immédiate du développement
 
+## Chantier catalogue, reprise et comptes — 28 septembre 2026
+
+- Implémenté : noms d'affichage et clés de tri distincts des valeurs fournisseur
+  pour les films, séries et épisodes. La migration SQLite v8 recalcule les
+  catalogues existants ; imports, synchronisation, recherche, favoris et reprise
+  utilisent maintenant les libellés nettoyés sans casser les identifiants Xtream.
+- Implémenté : suppression des préfixes pays/qualité/VIP/VOD et des suffixes de
+  format courants, avec conservation intégrale du nom brut en base.
+- Implémenté : préchargement depuis la fiche du média et cache mémoire court des
+  URL Xtream résolues. Le lecteur natif utilise une tolérance de seek plus large
+  et un tampon initial réduit pour privilégier la reprise rapide.
+- Implémenté : instrumentation anonyme des étapes `media-ready`, `url-ready`,
+  `engine-ready` et `first-progress`. En développement, le journal
+  `[NexusPlayer playback]` permet de distinguer le coût SQLite, la résolution et
+  le démarrage réel sans révéler de titre, d'identifiant ni d'URL.
+- Préparé : identité d'installation stockée dans SecureStore, session de compte,
+  contrat API d'appareils et de droits d'abonnement, sans adresse MAC. Architecture
+  détaillée dans `docs/ACCOUNT_SUBSCRIPTION_ARCHITECTURE.md`.
+- Reste nécessaire pour activer les abonnements : projet Supabase, produits et
+  clés publiques RevenueCat, URL de l'API et webhooks serveur. Les secrets privés
+  ne doivent jamais entrer dans l'application.
+- Validation automatique : TypeScript et ESLint réussis, 29 suites / 92 tests.
+- Validation physique suivante : relever les mesures de reprise d'un MP4 et d'un
+  MKV sur iPhone ; si `url-ready` est rapide mais `first-progress` reste lent, le
+  goulot se situe dans le serveur/conteneur/lecteur et non dans SQLite.
+
+## Identité visuelle NexusPlayer — 28 septembre 2026
+
+- Logo final : monogramme NexusPlayer original combinant un N et le symbole de
+  lecture, palette indigo/violet Obsidian sur fond `#070A0F`.
+- Livré : icône iOS opaque 1024 px, icône Android classique et adaptative,
+  variante monochrome Android 13, favicon et splash screen.
+- Livré : icône et bannière Android TV, ainsi que les sept formats Apple TV
+  exigés par `@react-native-tvos/config-tv` (icônes et Top Shelf).
+- Les sources maîtres sont dans `assets/brand`. Les exports sont reproductibles
+  avec `scripts/generate-brand-assets.ps1` et contrôlés par
+  `scripts/validate-brand-assets.ps1`.
+- Validation : 13 dimensions/formats contrôlés, configuration Expo mobile/TV
+  résolue, Expo Doctor 21/21, TypeScript, ESLint et 29 suites / 92 tests réussis.
+
 ## Dernier correctif — Live, catalogue complet et seek (28 septembre 2026)
 
 - L'indicateur Live tient compte des timestamps qui avancent ; un événement VLC
@@ -497,3 +537,17 @@ La prochaine étape de développement est le chantier décrit dans
 résolution des flux, contrôleur commun, seek rapide, fallback automatique,
 fonctions complètes, puis validation multi-appareil. Ne pas commencer une autre
 fonction majeure avant la validation des lots 1 à 5.
+
+## Performance catalogue et synchronisation — réalisé le 28 septembre 2026
+
+- Les aperçus de toutes les catégories Films/Séries sont maintenant chargés par
+  une requête SQLite groupée, au lieu d'une requête et d'un comptage par rayon.
+- Le dernier catalogue résolu reste en mémoire entre les changements d'onglet :
+  le contenu connu s'affiche immédiatement pendant la vérification de révision.
+- Les index SQLite V9 couvrent le tri par catégorie et les favoris sur les grands
+  catalogues.
+- Les sources Xtream et M3U distantes se synchronisent en arrière-plan après
+  l'ouverture et au retour dans l'app, sans bloquer l'interface. L'intervalle est
+  réglable dans Réglages (manuel, 1 h, 6 h par défaut, 12 h ou 24 h).
+- Une erreur fournisseur conserve le dernier catalogue valide. Les nouvelles
+  chaînes, films et séries apparaissent après la prochaine synchronisation réussie.

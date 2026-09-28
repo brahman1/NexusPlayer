@@ -71,19 +71,19 @@ export class WatchProgressRepository {
     return database.getAllAsync<ContinueWatchingItem>(
       `WITH latest_series_progress AS (
          SELECT wp.media_id, wp.media_kind, wp.position_seconds, wp.duration_seconds, wp.updated_at,
-                ep.name AS episode_name, ep.season_number, ep.episode_number, ep.series_id,
+                COALESCE(NULLIF(ep.display_name, ''), ep.name) AS episode_name, ep.season_number, ep.episode_number, ep.series_id,
                 ROW_NUMBER() OVER (PARTITION BY ep.series_id ORDER BY wp.updated_at DESC) AS series_rank
          FROM watch_progress wp
          JOIN episodes ep ON wp.media_kind = 'episode' AND ep.id = wp.media_id
        )
        SELECT wp.media_id AS mediaId, wp.media_kind AS mediaKind, wp.position_seconds AS positionSeconds,
               wp.duration_seconds AS durationSeconds, wp.updated_at AS updatedAt,
-              m.name AS title, NULL AS subtitle, m.poster_url AS imageUrl
+              COALESCE(NULLIF(m.display_name, ''), m.name) AS title, NULL AS subtitle, m.poster_url AS imageUrl
        FROM watch_progress wp JOIN movies m ON wp.media_kind = 'movie' AND m.id = wp.media_id
        UNION ALL
        SELECT latest.media_id AS mediaId, latest.media_kind AS mediaKind, latest.position_seconds AS positionSeconds,
               latest.duration_seconds AS durationSeconds, latest.updated_at AS updatedAt,
-              s.name AS title, 'S' || latest.season_number || ' E' || latest.episode_number || ' · ' || latest.episode_name AS subtitle,
+              COALESCE(NULLIF(s.display_name, ''), s.name) AS title, 'S' || latest.season_number || ' E' || latest.episode_number || ' · ' || latest.episode_name AS subtitle,
               s.poster_url AS imageUrl
        FROM latest_series_progress latest JOIN series s ON s.id = latest.series_id
        WHERE latest.series_rank = 1

@@ -10,6 +10,10 @@ const TEXT_SCALE_KEY = 'accessibility.textScale';
 const SUBTITLE_SIZE_KEY = 'subtitles.size';
 const VIDEO_CONTENT_FIT_KEY = 'playback.contentFit';
 const PLAYBACK_ENGINE_PREFIX = 'playback.engine.';
+const AUTO_SYNC_INTERVAL_KEY = 'sources.autoSyncIntervalHours';
+
+export type AutoSyncIntervalHours = 0 | 1 | 6 | 12 | 24;
+const AUTO_SYNC_INTERVALS: readonly AutoSyncIntervalHours[] = [0, 1, 6, 12, 24];
 
 let storage: MMKV | null = null;
 
@@ -57,4 +61,12 @@ export const preferences = {
     return value === 'native' || value === 'vlc' ? value : null;
   },
   setPlaybackEngine: (key: string, value: 'native' | 'vlc') => getStorage().set(`${PLAYBACK_ENGINE_PREFIX}${key}`, value),
+  getAutoSyncIntervalHours: (): AutoSyncIntervalHours => {
+    const value = getStorage().getNumber(AUTO_SYNC_INTERVAL_KEY);
+    return AUTO_SYNC_INTERVALS.includes(value as AutoSyncIntervalHours)
+      ? value as AutoSyncIntervalHours
+      : 6;
+  },
+  setAutoSyncIntervalHours: (value: AutoSyncIntervalHours) =>
+    getStorage().set(AUTO_SYNC_INTERVAL_KEY, value),
 };

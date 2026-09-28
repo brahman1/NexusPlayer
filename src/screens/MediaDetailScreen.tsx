@@ -6,7 +6,7 @@ import { ActionButton, EmptyState, PageHeader, Panel } from '../components/Nexus
 import { Screen } from '../components/Screen';
 import { DiscoveryRepository } from '../repositories/DiscoveryRepository';
 import { WatchProgressRepository } from '../repositories/WatchProgressRepository';
-import { syncXtreamSeriesEpisodes } from '../services/xtreamImportService';
+import { prefetchXtreamMedia, syncXtreamSeriesEpisodes } from '../services/xtreamImportService';
 import { colors, spacing } from '../theme/tokens';
 import type { Movie, Series } from '../types/domain';
 
@@ -28,19 +28,26 @@ export function MediaDetailScreen() {
   useEffect(() => {
     if (!id) return;
     const load = async () => {
-      const media = kind === 'movie' ? await discovery.movieById(id) : await discovery.seriesById(id);
-      setItem(media);
       if (kind === 'movie') {
+        const movie = await discovery.movieById(id);
+        setItem(movie);
+        if (movie) void prefetchXtreamMedia(movie.playlistId, movie.streamUrl).catch(() => undefined);
         setHasMovieProgress(Boolean(await progressRepository.get(id, 'movie')));
         return;
       }
+      const media = await discovery.seriesById(id);
+      setItem(media);
       let rows = await discovery.episodes(id);
       if (rows.length === 0) {
         await syncXtreamSeriesEpisodes(id);
         rows = await discovery.episodes(id);
       }
       setEpisodes(rows);
-      setResumeEpisodeId((await progressRepository.resumeEpisodeForSeries(id))?.id ?? null);
+      const target = (await progressRepository.resumeEpisodeForSeries(id))?.id ?? rows[0]?.id ?? null;
+      setResumeEpisodeId(target && target !== rows[0]?.id ? target : null);
+      if (target) {
+        void discovery.episodeById(target).then((episode) => episode && prefetchXtreamMedia(episode.playlist_id, episode.stream_url)).catch(() => undefined);
+      }
     };
     load().catch(() => undefined).finally(() => setLoading(false));
   }, [id, kind]);

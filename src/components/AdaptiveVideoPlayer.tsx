@@ -31,13 +31,14 @@ export function AdaptiveVideoPlayer(props: TrackedVideoPlayerProps) {
     setEngineIndex(1);
   }, [engines.length]);
 
-  const progress = useCallback((seconds: number) => { latestPosition.current = seconds; }, []);
+  const progress = useCallback((seconds: number) => { latestPosition.current = seconds; props.onProgress?.(seconds); }, [props]);
 
   const ready = useCallback(() => {
     preferences.setPlaybackEngine(preferenceKey, engine);
     setReadyEngine(engine);
     setNotice(null);
-  }, [engine, preferenceKey]);
+    props.onReady?.();
+  }, [engine, preferenceKey, props]);
 
   useEffect(() => {
     if (readyEngine === engine) return;
