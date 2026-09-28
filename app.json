@@ -15,6 +15,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.brahman1.nexusplayer",
       "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true
         }
@@ -65,6 +66,13 @@
     ],
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "53d53644-f650-485b-a666-9e6272be6804"
+      }
+    },
+    "owner": "brahman2014"
   }
 }

@@ -23,5 +23,12 @@
         "EXPO_TV": "0"
       }
     }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "ascAppId": "6816678184"
+      }
+    }
   }
 }
