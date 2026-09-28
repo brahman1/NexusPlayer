@@ -460,3 +460,11 @@ la référence principale.
   importées depuis les sources de l'utilisateur.
 - Pour les séries, « Ajouts récents » suit l'ordre d'import local car Xtream ne
   fournit pas systématiquement une date de sortie exploitable.
+
+## Prochaine priorité — lecteur adaptatif
+
+La prochaine étape de développement est le chantier décrit dans
+[`PLAYER_ROADMAP.md`](PLAYER_ROADMAP.md). Respecter l’ordre des lots : diagnostic,
+résolution des flux, contrôleur commun, seek rapide, fallback automatique,
+fonctions complètes, puis validation multi-appareil. Ne pas commencer une autre
+fonction majeure avant la validation des lots 1 à 5.
