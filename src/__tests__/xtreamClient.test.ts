@@ -10,6 +10,8 @@ describe('Xtream client', () => {
   it('construit les flux uniquement au moment de la lecture', () => {
     expect(xtreamMediaUrl('https://example.com', credentials, 'xtream://live/42.ts'))
       .toBe('https://example.com/live/user%40example.com/p%40ss%20word/42.ts');
+    expect(xtreamMediaUrl('https://example.com', credentials, 'xtream://live/42'))
+      .toBe('https://example.com/live/user%40example.com/p%40ss%20word/42');
   });
 
   it('valide le compte puis charge les six catalogues', async () => {

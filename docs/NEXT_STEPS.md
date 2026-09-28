@@ -569,3 +569,15 @@ fonction majeure avant la validation des lots 1 à 5.
 
 Prochain lot : écran de préférences pays/langues par profil, filtres visibles,
 corrections manuelles et conservation facultative de la vue brute du fournisseur.
+
+### Navigation Live et compatibilité Xtream
+
+- Les chaînes sont présentées en deux niveaux : thème canonique, puis pays. Par
+  exemple, « Sport » ouvre France, Turquie, États-Unis, etc., sans dupliquer le
+  thème principal.
+- Sur iOS/tvOS avec un serveur HTTP, le Live utilise VLC et essaie successivement
+  le flux TS, l'URL sans extension puis HLS. La variante HLS n'est plus essayée en
+  premier lorsqu'un fournisseur la refuse avec une erreur serveur.
+- Le délai de bascule VLC est ramené à dix secondes et aucun essai natif inutile
+  n'est lancé pour les Live HTTP Apple, ce qui évite aussi d'exposer l'URL complète
+  dans les avertissements AVFoundation.

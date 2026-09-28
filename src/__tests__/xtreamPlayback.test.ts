@@ -8,8 +8,8 @@ jest.mock('../storage/credentialVault', () => ({ deleteCredentials: jest.fn(), l
 describe('lecture Xtream par plateforme', () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it('utilise HLS sur iOS pour éviter les flux TS progressifs incompatibles', () => {
-    expect(compatibleLiveMarker('xtream://live/42.ts', 'ios')).toBe('xtream://live/42.m3u8');
+  it('utilise TS via VLC en premier sur iOS et conserve des solutions de repli', () => {
+    expect(compatibleLiveMarker('xtream://live/42.ts', 'ios')).toBe('xtream://live/42.ts');
   });
 
   it('conserve le flux TS sur Android', () => {

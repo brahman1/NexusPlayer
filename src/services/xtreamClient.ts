@@ -64,9 +64,10 @@ export async function fetchXtreamCatalog(serverUrl: string, credentials: XtreamC
 }
 
 export function xtreamMediaUrl(serverUrl: string, credentials: XtreamCredentials, marker: string) {
-  const match = marker.match(/^xtream:\/\/(live|movie|series)\/(\d+)\.([\w-]+)$/);
+  const match = marker.match(/^xtream:\/\/(live|movie|series)\/(\d+)(?:\.([\w-]+))?$/);
   if (!match) return marker;
-  return `${normalizeXtreamServer(serverUrl)}/${match[1]}/${encodeURIComponent(credentials.username)}/${encodeURIComponent(credentials.password)}/${match[2]}.${match[3]}`;
+  const extension = match[3] ? `.${match[3]}` : '';
+  return `${normalizeXtreamServer(serverUrl)}/${match[1]}/${encodeURIComponent(credentials.username)}/${encodeURIComponent(credentials.password)}/${match[2]}${extension}`;
 }
 
 export type XtreamEpisode = { id: string; season: number; episode: number; name: string; extension: string; durationSeconds: number | null };

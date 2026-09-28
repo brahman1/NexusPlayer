@@ -18,7 +18,9 @@ export function mediaExtension(uri: string) {
 export function engineOrder(uri: string, kind: PlaybackKind, remembered?: PlaybackEngine | null, platform = ''): PlaybackEngine[] {
   const extension = mediaExtension(uri);
   if ((platform === 'ios' || platform === 'tvos') && extension && ['mkv', 'avi', 'wmv', 'flv'].includes(extension)) return ['vlc'];
-  if ((platform === 'ios' || platform === 'tvos') && /^http:\/\//i.test(uri)) return ['vlc', 'native'];
+  if ((platform === 'ios' || platform === 'tvos') && /^http:\/\//i.test(uri)) {
+    return kind === 'live' ? ['vlc'] : ['vlc', 'native'];
+  }
   if (remembered) return [remembered, remembered === 'native' ? 'vlc' : 'native'];
   if (extension && VLC_FIRST_EXTENSIONS.has(extension)) return ['vlc', 'native'];
   if (extension && NATIVE_FIRST_EXTENSIONS.has(extension)) return ['native', 'vlc'];
@@ -49,8 +51,13 @@ export function redactPlaybackUri(uri: string) {
 }
 
 export function liveMarkerCandidates(marker: string, platform: string) {
-  if (!/^xtream:\/\/live\/\d+\.(ts|m3u8)$/i.test(marker)) return [marker];
-  const hls = marker.replace(/\.(ts|m3u8)$/i, '.m3u8');
-  const transportStream = marker.replace(/\.(ts|m3u8)$/i, '.ts');
-  return platform === 'ios' ? [hls, transportStream] : [transportStream, hls];
+  const match = marker.match(/^xtream:\/\/live\/(\d+)(?:\.(ts|m3u8))?$/i);
+  if (!match) return [marker];
+  const base = `xtream://live/${match[1]}`;
+  const transportStream = `${base}.ts`;
+  const extensionless = base;
+  const hls = `${base}.m3u8`;
+  return platform === 'ios' || platform === 'tvos'
+    ? [transportStream, extensionless, hls]
+    : [transportStream, hls, extensionless];
 }

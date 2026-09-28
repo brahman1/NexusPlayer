@@ -7,6 +7,7 @@ import { FocusableCard } from '../components/FocusableCard';
 import { Screen } from '../components/Screen';
 import { SQLiteChannelRepository, type ChannelCategory } from '../repositories/SQLiteChannelRepository';
 import { EpgRepository } from '../repositories/EpgRepository';
+import { buildChannelCategoryHierarchy } from '../services/channelCategoryHierarchy';
 import { preferences } from '../storage/preferences';
 import { colors, radii, spacing } from '../theme/tokens';
 import type { Channel } from '../types/domain';
@@ -16,6 +17,7 @@ const epgRepository = new EpgRepository();
 const PAGE_SIZE = 250;
 const ROW_STRIDE = 92;
 type Filter = 'all' | 'favorites' | 'recent' | string;
+const THEME_PREFIX = 'theme:';
 
 function FilterButton({ active, label, onPress }: { active: boolean; label: string; onPress: () => void }) {
   return (
@@ -43,6 +45,7 @@ export function ChannelListScreen() {
   const [categories, setCategories] = useState<ChannelCategory[]>([]);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
+  const [countryFilter, setCountryFilter] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
@@ -55,7 +58,12 @@ export function ChannelListScreen() {
   const loadingMoreRef = useRef(false);
   const listRef = useRef<FlatList<Channel>>(null);
   const lastFocusedId = id ? preferences.getLastFocusedChannel(id) : null;
-  const selectedCategoryIds = useMemo(() => categories.find((category) => category.id === filter)?.categoryIds, [categories, filter]);
+  const categoryHierarchy = useMemo(() => buildChannelCategoryHierarchy(categories), [categories]);
+  const selectedTheme = filter.startsWith(THEME_PREFIX) ? filter.slice(THEME_PREFIX.length) : null;
+  const selectedThemeGroup = useMemo(() => categoryHierarchy.find((group) => group.theme === selectedTheme), [categoryHierarchy, selectedTheme]);
+  const selectedCategoryIds = useMemo(() => countryFilter
+    ? selectedThemeGroup?.countries.find((group) => group.country === countryFilter)?.categoryIds
+    : selectedThemeGroup?.categoryIds, [countryFilter, selectedThemeGroup]);
   const categoryNamesById = useMemo(() => new Map(categories.flatMap((category) => category.categoryIds.map((categoryId) => [categoryId, category.displayName] as const))), [categories]);
 
   const loadChannels = useCallback(async () => {
@@ -124,7 +132,14 @@ export function ChannelListScreen() {
     const version = requestVersion.current;
     const offset = Math.max(0, loadedOffset - PAGE_SIZE);
     try {
-      const previousPage = await repository.listByPlaylist(id, { limit: loadedOffset - offset, offset });
+      const previousPage = await repository.listByPlaylist(id, {
+        search,
+        categoryIds: selectedCategoryIds,
+        favoritesOnly: filter === 'favorites',
+        recentOnly: filter === 'recent',
+        limit: loadedOffset - offset,
+        offset,
+      });
       if (version === requestVersion.current) {
         setChannels((current) => [...previousPage, ...current]);
         setLoadedOffset(offset);
@@ -135,7 +150,7 @@ export function ChannelListScreen() {
       loadingMoreRef.current = false;
       if (version === requestVersion.current) setLoadingMore(false);
     }
-  }, [id, loadedOffset, loading]);
+  }, [filter, id, loadedOffset, loading, search, selectedCategoryIds]);
 
   useEffect(() => {
     if (!id) return;
@@ -193,18 +208,29 @@ export function ChannelListScreen() {
           showsHorizontalScrollIndicator={false}
           style={styles.filterScroller}
         >
-          <FilterButton active={filter === 'all'} label="Toutes" onPress={() => setFilter('all')} />
-          <FilterButton active={filter === 'favorites'} label="Favoris" onPress={() => setFilter('favorites')} />
-          <FilterButton active={filter === 'recent'} label="Récentes" onPress={() => setFilter('recent')} />
-          {categories.map((category) => (
+          <FilterButton active={filter === 'all'} label="Toutes" onPress={() => { setFilter('all'); setCountryFilter(null); }} />
+          <FilterButton active={filter === 'favorites'} label="Favoris" onPress={() => { setFilter('favorites'); setCountryFilter(null); }} />
+          <FilterButton active={filter === 'recent'} label="Récentes" onPress={() => { setFilter('recent'); setCountryFilter(null); }} />
+          {categoryHierarchy.map((group) => (
             <FilterButton
-              active={filter === category.id}
-              key={category.id}
-              label={`${category.displayName} (${category.channelCount})`}
-              onPress={() => setFilter(category.id)}
+              active={selectedTheme === group.theme}
+              key={group.theme}
+              label={`${group.theme} (${group.count})`}
+              onPress={() => { setFilter(`${THEME_PREFIX}${group.theme}`); setCountryFilter(null); }}
             />
           ))}
         </ScrollView>
+        {selectedThemeGroup && selectedThemeGroup.countries.length > 0 && (
+          <View style={styles.countrySection}>
+            <Text style={styles.countryTitle}>{selectedThemeGroup.theme} · choisir un pays</Text>
+            <ScrollView contentContainerStyle={styles.countryFilters} horizontal showsHorizontalScrollIndicator={false}>
+              <FilterButton active={countryFilter === null} label={`Tous les pays (${selectedThemeGroup.count})`} onPress={() => setCountryFilter(null)} />
+              {selectedThemeGroup.countries.map((country) => (
+                <FilterButton active={countryFilter === country.country} key={country.country} label={`${country.country} (${country.count})`} onPress={() => setCountryFilter(country.country)} />
+              ))}
+            </ScrollView>
+          </View>
+        )}
 
         {loading ? <ActivityIndicator color={colors.accentStrong} /> : (
           <View style={styles.body}>
@@ -279,6 +305,9 @@ const styles = StyleSheet.create({
   search: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radii.md, borderWidth: 1, color: colors.text, fontSize: 17, marginTop: spacing.md, minHeight: 54, paddingHorizontal: spacing.md },
   filterScroller: { flexGrow: 0, flexShrink: 0, height: 70 },
   filters: { alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm },
+  countrySection: { gap: spacing.xs, marginBottom: spacing.sm },
+  countryTitle: { color: colors.textMuted, fontSize: 12, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase' },
+  countryFilters: { alignItems: 'center', gap: spacing.sm, paddingBottom: spacing.sm },
   filterButton: { minHeight: 46, minWidth: 110, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   filterActive: { backgroundColor: colors.accent, borderColor: colors.accentStrong },
   filterLabel: { color: colors.textMuted, fontSize: 14, fontWeight: '700' },

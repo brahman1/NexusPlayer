@@ -29,7 +29,7 @@ import type { Channel } from '../types/domain';
 
 const repository = new SQLiteChannelRepository();
 const epgRepository = new EpgRepository();
-const LIVE_VLC_OPTIONS = ['--network-caching=1000', '--http-reconnect'];
+const LIVE_VLC_OPTIONS = ['--network-caching=1200', '--http-reconnect', '--clock-jitter=0', '--http-user-agent=VLC/3.0.20 LibVLC/3.0.20'];
 
 function sourceForChannel(channel: Channel): VideoSource {
   return channel.streamUrl.toLowerCase().includes('.m3u8')
@@ -187,7 +187,7 @@ function VlcLiveSurface({ channel, fullscreen, onEngineFailure, onEngineReady }:
     const timer = setTimeout(() => {
       setError('Délai de connexion dépassé pour ce flux.');
       onEngineFailure();
-    }, 25_000);
+    }, 10_000);
     return () => clearTimeout(timer);
   }, [error, onEngineFailure, ready]);
   return <View style={[styles.playerBlock, fullscreen && styles.playerBlockFullscreen]}>
@@ -347,12 +347,15 @@ export function PlayerScreen() {
       setRetryGeneration((current) => current + 1);
       return;
     }
-    if (!engineFallbackUsed) {
+    const supportsAlternateEngine = channel
+      ? engineOrder(channel.streamUrl, 'live', null, Platform.OS).length > 1
+      : false;
+    if (!engineFallbackUsed && supportsAlternateEngine) {
       setEngineFallbackUsed(true);
       setLiveEngine((current) => alternateEngine(current));
       setRetryGeneration((current) => current + 1);
     }
-  }, [channelVariants, engineFallbackUsed, variantIndex]);
+  }, [channel, channelVariants, engineFallbackUsed, variantIndex]);
 
   useTVEventHandler((event) => {
     if (!Platform.isTV || event.eventKeyAction === 1) return;
