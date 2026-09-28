@@ -211,7 +211,7 @@ export function PlayerScreen() {
     const key = playbackPreferenceKey(first.streamUrl, 'live', Platform.OS);
     setChannelVariants(variants);
     setVariantIndex(0);
-    setLiveEngine(engineOrder(first.streamUrl, 'live', preferences.getPlaybackEngine(key))[0]!);
+    setLiveEngine(engineOrder(first.streamUrl, 'live', preferences.getPlaybackEngine(key), Platform.OS)[0]!);
     setEngineFallbackUsed(false);
     setChannel(first);
   }, []);

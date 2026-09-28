@@ -15,9 +15,10 @@ export function mediaExtension(uri: string) {
   }
 }
 
-export function engineOrder(uri: string, kind: PlaybackKind, remembered?: PlaybackEngine | null): PlaybackEngine[] {
-  if (remembered) return [remembered, remembered === 'native' ? 'vlc' : 'native'];
+export function engineOrder(uri: string, kind: PlaybackKind, remembered?: PlaybackEngine | null, platform = ''): PlaybackEngine[] {
   const extension = mediaExtension(uri);
+  if ((platform === 'ios' || platform === 'tvos') && extension && ['mkv', 'avi', 'wmv', 'flv'].includes(extension)) return ['vlc'];
+  if (remembered) return [remembered, remembered === 'native' ? 'vlc' : 'native'];
   if (extension && VLC_FIRST_EXTENSIONS.has(extension)) return ['vlc', 'native'];
   if (extension && NATIVE_FIRST_EXTENSIONS.has(extension)) return ['native', 'vlc'];
   return kind === 'live' ? ['native', 'vlc'] : ['vlc', 'native'];
@@ -29,9 +30,9 @@ export function alternateEngine(engine: PlaybackEngine): PlaybackEngine {
 
 export function playbackPreferenceKey(uri: string, kind: PlaybackKind, platform: string) {
   try {
-    return `${platform}:${kind}:${new URL(uri).host.toLowerCase()}`;
+    return `${platform}:${kind}:${mediaExtension(uri) ?? 'unknown'}:${new URL(uri).host.toLowerCase()}`;
   } catch {
-    return `${platform}:${kind}:unknown`;
+    return `${platform}:${kind}:${mediaExtension(uri) ?? 'unknown'}:unknown`;
   }
 }
 

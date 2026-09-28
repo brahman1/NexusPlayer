@@ -16,12 +16,17 @@ describe('playback strategy', () => {
     expect(alternateEngine('native')).toBe('vlc');
   });
 
+  it('never sends unsupported Apple containers to the native engine', () => {
+    expect(engineOrder('https://media.test/series/1.mkv', 'episode', 'native', 'ios')).toEqual(['vlc']);
+    expect(engineOrder('https://media.test/movie/1.avi', 'movie', null, 'tvos')).toEqual(['vlc']);
+  });
+
   it('builds platform-specific live variants without exposing credentials', () => {
     expect(liveMarkerCandidates('xtream://live/42.ts', 'ios')).toEqual(['xtream://live/42.m3u8', 'xtream://live/42.ts']);
     expect(liveMarkerCandidates('xtream://live/42.m3u8', 'android')).toEqual(['xtream://live/42.ts', 'xtream://live/42.m3u8']);
     const uri = 'http://example.test/live/private-user/private-password/42.ts?token=secret';
     expect(redactPlaybackUri(uri)).toBe('http://example.test/…/42.ts');
-    expect(playbackPreferenceKey(uri, 'live', 'ios')).toBe('ios:live:example.test');
+    expect(playbackPreferenceKey(uri, 'live', 'ios')).toBe('ios:live:ts:example.test');
     expect(mediaExtension(uri)).toBe('ts');
   });
 });
