@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { useVideoPlayer, VideoView, type AudioTrack, type SubtitleTrack, type VideoPlayer, type VideoSource, type VideoTrack } from 'expo-video';
+import { LibVlcPlayerView } from 'expo-libvlc-player';
 
 import { FocusableCard } from '../components/FocusableCard';
 import { Screen } from '../components/Screen';
@@ -18,7 +19,8 @@ import { SQLiteChannelRepository } from '../repositories/SQLiteChannelRepository
 import { EpgRepository } from '../repositories/EpgRepository';
 import { explainPlaybackError } from '../services/playerDiagnostics';
 import { isRecoverableLiveError, liveReconnectDelay, MAX_LIVE_RECONNECT_ATTEMPTS } from '../services/liveReconnect';
-import { resolveXtreamChannel } from '../services/xtreamImportService';
+import { resolveXtreamChannel, resolveXtreamChannelCandidates } from '../services/xtreamImportService';
+import { alternateEngine, engineOrder, playbackPreferenceKey, type PlaybackEngine } from '../services/playbackStrategy';
 import { preferences } from '../storage/preferences';
 import { colors, radii, spacing } from '../theme/tokens';
 import type { Channel } from '../types/domain';
@@ -55,7 +57,7 @@ function PlayerAction({ autoFocus = false, label, onPress }: { autoFocus?: boole
 
 type AdjacentChannels = { previous: Channel | null; next: Channel | null };
 
-function PlayerSurface({ adjacent, channel, onAutomaticRetry, onRecovered, onRetry, retryAttempt, showSettings }: {
+function PlayerSurface({ adjacent, channel, onAutomaticRetry, onEngineFailure, onEngineReady, onRecovered, onRetry, retryAttempt, showSettings }: {
   adjacent: AdjacentChannels;
   channel: Channel;
   onAutomaticRetry: () => void;
@@ -63,6 +65,8 @@ function PlayerSurface({ adjacent, channel, onAutomaticRetry, onRecovered, onRet
   onRetry: () => void;
   retryAttempt: number;
   showSettings: boolean;
+  onEngineFailure?: () => void;
+  onEngineReady?: () => void;
 }) {
   const player = useVideoPlayer(sourceForChannel(channel), (instance) => {
     instance.bufferOptions = {
@@ -89,13 +93,15 @@ function PlayerSurface({ adjacent, channel, onAutomaticRetry, onRecovered, onRet
 
   useEffect(() => {
     if (status === 'readyToPlay') {
+      onEngineReady?.();
       onRecovered();
       return;
     }
+    if (status === 'error') onEngineFailure?.();
     if (!reconnectPending) return;
     const timer = setTimeout(onAutomaticRetry, liveReconnectDelay(retryAttempt));
     return () => clearTimeout(timer);
-  }, [onAutomaticRetry, onRecovered, reconnectPending, retryAttempt, status]);
+  }, [onAutomaticRetry, onEngineFailure, onEngineReady, onRecovered, reconnectPending, retryAttempt, status]);
 
   useEventListener(player, 'sourceLoad', ({ availableAudioTracks, availableSubtitleTracks, availableVideoTracks }) => {
     setAudioTracks(availableAudioTracks);
@@ -159,11 +165,38 @@ function PlayerSurface({ adjacent, channel, onAutomaticRetry, onRecovered, onRet
   );
 }
 
+function VlcLiveSurface({ channel, onEngineFailure, onEngineReady }: { channel: Channel; onEngineFailure: () => void; onEngineReady: () => void }) {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const problem = error ? explainPlaybackError(error) : null;
+  return <View style={styles.playerBlock}>
+    <View style={styles.videoFrame}>
+      <LibVlcPlayerView
+        autoplay
+        contentFit="contain"
+        onBuffering={({ value }) => setLoading(value < 100)}
+        onEncounteredError={({ message }) => { setLoading(false); setError(message); onEngineFailure(); }}
+        onPlaying={() => { setLoading(false); setError(null); onEngineReady(); }}
+        options={['--network-caching=1000', '--http-reconnect', '--clock-jitter=0']}
+        pictureInPicture={!Platform.isTV}
+        source={channel.streamUrl}
+        style={styles.video}
+      />
+      {loading && <View pointerEvents="none" style={styles.loadingOverlay}><ActivityIndicator color={colors.accentStrong} size="large" /><Text style={styles.loadingText}>Connexion au flux…</Text></View>}
+    </View>
+    {problem && <View accessibilityRole="alert" style={styles.problem}><Text style={styles.problemTitle}>{problem.title}</Text><Text style={styles.problemDetail}>{problem.detail}</Text></View>}
+  </View>;
+}
+
 export function PlayerScreen() {
   const { channelId } = useLocalSearchParams<{ channelId: string }>();
   const { width } = useWindowDimensions();
   const compact = !Platform.isTV && width < 700;
   const [channel, setChannel] = useState<Channel | null>(null);
+  const [channelVariants, setChannelVariants] = useState<Channel[]>([]);
+  const [variantIndex, setVariantIndex] = useState(0);
+  const [liveEngine, setLiveEngine] = useState<PlaybackEngine>('native');
+  const [engineFallbackUsed, setEngineFallbackUsed] = useState(false);
   const [adjacent, setAdjacent] = useState<AdjacentChannels>({ previous: null, next: null });
   const [error, setError] = useState<string | null>(null);
   const [switching, setSwitching] = useState(false);
@@ -173,19 +206,29 @@ export function PlayerScreen() {
   const [programmes, setProgrammes] = useState<Awaited<ReturnType<EpgRepository['nowNext']>>>([]);
   const [overlay, setOverlay] = useState<'compact' | 'guide' | 'settings' | null>('compact');
 
+  const configureVariants = useCallback((variants: Channel[]) => {
+    const first = variants[0]!;
+    const key = playbackPreferenceKey(first.streamUrl, 'live', Platform.OS);
+    setChannelVariants(variants);
+    setVariantIndex(0);
+    setLiveEngine(engineOrder(first.streamUrl, 'live', preferences.getPlaybackEngine(key))[0]!);
+    setEngineFallbackUsed(false);
+    setChannel(first);
+  }, []);
+
   useEffect(() => {
     if (!channelId) return;
     repository.findById(channelId)
       .then((found) => {
         if (!found) throw new Error('Chaîne introuvable.');
-        return resolveXtreamChannel(found).then((resolved) => {
-          setChannel(resolved);
+        return resolveXtreamChannelCandidates(found).then((resolved) => {
+          configureVariants(resolved);
           preferences.setLastPlayingChannel(found.id);
           return repository.markWatched(found.id);
         });
       })
       .catch((caught) => setError(caught instanceof Error ? caught.message : 'Lecture impossible.'));
-  }, [channelId]);
+  }, [channelId, configureVariants]);
 
   useEffect(() => {
     if (!channel) return;
@@ -217,9 +260,9 @@ export function PlayerScreen() {
       const preloaded = adjacent[direction];
       const found = preloaded ?? await repository.findAdjacent(channel.id, direction);
       if (!found) throw new Error('Aucune autre chaîne disponible.');
-      const resolved = preloaded ?? await resolveXtreamChannel(found);
+      const variants = preloaded ? [preloaded] : await resolveXtreamChannelCandidates(found);
       setAdjacent({ previous: null, next: null });
-      setChannel(resolved);
+      configureVariants(variants);
       setRetryAttempt(0);
       setRetryGeneration(0);
       preferences.setLastPlayingChannel(found.id);
@@ -230,17 +273,42 @@ export function PlayerScreen() {
       switchingRef.current = false;
       setSwitching(false);
     }
-  }, [adjacent, channel]);
+  }, [adjacent, channel, configureVariants]);
 
   const retryAutomatically = useCallback(() => {
+    const nextVariant = variantIndex + 1;
+    if (nextVariant < channelVariants.length) {
+      setVariantIndex(nextVariant);
+      setChannel(channelVariants[nextVariant]!);
+      setRetryAttempt(0);
+      setRetryGeneration((current) => current + 1);
+      return;
+    }
     setRetryAttempt((current) => Math.min(current + 1, MAX_LIVE_RECONNECT_ATTEMPTS));
     setRetryGeneration((current) => current + 1);
-  }, []);
+  }, [channelVariants, variantIndex]);
   const retryManually = useCallback(() => {
     setRetryAttempt(0);
     setRetryGeneration((current) => current + 1);
   }, []);
-  const markRecovered = useCallback(() => setRetryAttempt((current) => current === 0 ? current : 0), []);
+  const markRecovered = useCallback(() => {
+    setRetryAttempt((current) => current === 0 ? current : 0);
+    if (channel) preferences.setPlaybackEngine(playbackPreferenceKey(channel.streamUrl, 'live', Platform.OS), liveEngine);
+  }, [channel, liveEngine]);
+  const handleEngineFailure = useCallback(() => {
+    const nextVariant = variantIndex + 1;
+    if (nextVariant < channelVariants.length) {
+      setVariantIndex(nextVariant);
+      setChannel(channelVariants[nextVariant]!);
+      setRetryGeneration((current) => current + 1);
+      return;
+    }
+    if (!engineFallbackUsed) {
+      setEngineFallbackUsed(true);
+      setLiveEngine((current) => alternateEngine(current));
+      setRetryGeneration((current) => current + 1);
+    }
+  }, [channelVariants, engineFallbackUsed, variantIndex]);
 
   useTVEventHandler((event) => {
     if (!Platform.isTV || event.eventKeyAction === 1) return;
@@ -254,18 +322,20 @@ export function PlayerScreen() {
   return (
     <Screen>
       <View style={[styles.container, compact && styles.containerCompact]}>
-        {channel ? (
+        {channel ? liveEngine === 'native' ? (
           <PlayerSurface
             adjacent={adjacent}
             channel={channel}
-            key={`${channel.id}:${retryGeneration}`}
+            key={`native:${channel.id}:${retryGeneration}`}
             onAutomaticRetry={retryAutomatically}
+            onEngineFailure={handleEngineFailure}
+            onEngineReady={markRecovered}
             onRecovered={markRecovered}
             onRetry={retryManually}
             retryAttempt={retryAttempt}
             showSettings={overlay === 'settings'}
           />
-        ) : !error && <ActivityIndicator color={colors.accentStrong} size="large" />}
+        ) : <VlcLiveSurface channel={channel} key={`vlc:${channel.id}:${retryGeneration}`} onEngineFailure={handleEngineFailure} onEngineReady={markRecovered} /> : !error && <ActivityIndicator color={colors.accentStrong} size="large" />}
         {channel && overlay && (
           <View style={[styles.details, compact && styles.detailsCompact]}>
             <View style={styles.channelDetails}>

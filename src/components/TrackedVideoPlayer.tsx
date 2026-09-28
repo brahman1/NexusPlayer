@@ -13,13 +13,15 @@ import { colors, radii, spacing } from '../theme/tokens';
 const progressRepository = new WatchProgressRepository();
 const VOD_PLAYER_OPTIONS = ['--network-caching=750', '--input-fast-seek', '--http-reconnect'];
 
-type Props = {
+export type TrackedVideoPlayerProps = {
   mediaId: string;
   mediaKind: 'movie' | 'episode';
   name: string;
   nextEpisode?: { name: string; onPress: () => void };
   onEnded?: () => void | Promise<void>;
+  onFatalError?: (message: string) => void;
   onFullscreenChange?: (fullscreen: boolean) => void;
+  onReady?: () => void;
   resumeSeconds: number;
   uri: string;
 };
@@ -30,7 +32,7 @@ function playableTracks(items: MediaTrack[]) {
   return items.filter((item, index) => item.id >= 0 && items.findIndex((candidate) => candidate.id === item.id) === index);
 }
 
-export function TrackedVideoPlayer({ mediaId, mediaKind, name, nextEpisode, onEnded, onFullscreenChange, resumeSeconds, uri }: Props) {
+export function TrackedVideoPlayer({ mediaId, mediaKind, name, nextEpisode, onEnded, onFatalError, onFullscreenChange, onReady, resumeSeconds, uri }: TrackedVideoPlayerProps) {
   const { width } = useWindowDimensions();
   const compact = !Platform.isTV && width < 600;
   const playerRef = useRef<LibVlcPlayerViewRef>(null);
@@ -41,6 +43,8 @@ export function TrackedVideoPlayer({ mediaId, mediaKind, name, nextEpisode, onEn
   const lastSavedAt = useRef(resumeSeconds);
   const queue = useRef<Promise<unknown>>(Promise.resolve());
   const bufferingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const seekWatchdog = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const seekGeneration = useRef(0);
   const controlsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [duration, setDuration] = useState(0);
   const [position, setPosition] = useState(resumeSeconds);
@@ -95,6 +99,11 @@ export function TrackedVideoPlayer({ mediaId, mediaKind, name, nextEpisode, onEn
     bufferingTimer.current = setTimeout(() => setBuffering(true), 650);
   }, []);
 
+  const clearSeekWatchdog = useCallback(() => {
+    if (seekWatchdog.current) clearTimeout(seekWatchdog.current);
+    seekWatchdog.current = null;
+  }, []);
+
   const clearControlsTimer = useCallback(() => {
     if (controlsTimer.current) clearTimeout(controlsTimer.current);
     controlsTimer.current = null;
@@ -108,20 +117,31 @@ export function TrackedVideoPlayer({ mediaId, mediaKind, name, nextEpisode, onEn
 
   const seekTo = useCallback(async (seconds: number) => {
     const target = Math.max(0, Math.min(latestDuration.current || Number.MAX_SAFE_INTEGER, seconds));
+    const generation = ++seekGeneration.current;
     latestPosition.current = target;
     setPosition(target);
     setScrubPosition(target);
-    setBuffering(true);
+    clearBufferingTimer();
+    clearSeekWatchdog();
+    scheduleBufferingIndicator();
+    seekWatchdog.current = setTimeout(() => {
+      if (seekGeneration.current !== generation) return;
+      clearBufferingTimer();
+      setBuffering(false);
+      setNotice('Le serveur met trop de temps à atteindre cette position. Réessayez ou utilisez les boutons ±10/30 s.');
+    }, 8000);
     try {
       const mediaDuration = latestDuration.current;
       if (mediaDuration > 0) await playerRef.current?.seek(Math.max(0, Math.min(1, target / mediaDuration)), 'position');
       else await playerRef.current?.seek(Math.round(target * 1000), 'time');
       if (playing) await playerRef.current?.play();
     } catch {
+      clearSeekWatchdog();
+      clearBufferingTimer();
       setBuffering(false);
       setNotice('Impossible d’atteindre cette position dans le flux.');
     }
-  }, [playing]);
+  }, [clearBufferingTimer, clearSeekWatchdog, playing, scheduleBufferingIndicator]);
 
   const seekBy = useCallback((seconds: number) => seekTo(latestPosition.current + seconds), [seekTo]);
 
@@ -176,10 +196,11 @@ export function TrackedVideoPlayer({ mediaId, mediaKind, name, nextEpisode, onEn
 
   useEffect(() => () => {
     clearBufferingTimer();
+    clearSeekWatchdog();
     clearControlsTimer();
     onFullscreenChange?.(false);
     if (!Platform.isTV) void ScreenOrientation.unlockAsync();
-  }, [clearBufferingTimer, clearControlsTimer, onFullscreenChange]);
+  }, [clearBufferingTimer, clearControlsTimer, clearSeekWatchdog, onFullscreenChange]);
 
   const selectAudioTrack = useCallback((id: number) => {
     setTracks((current) => ({ ...current, audio: id }));
@@ -208,6 +229,7 @@ export function TrackedVideoPlayer({ mediaId, mediaKind, name, nextEpisode, onEn
         onBuffering={({ value }) => {
           if (value >= 100) {
             clearBufferingTimer();
+            clearSeekWatchdog();
             setBuffering(false);
           } else {
             scheduleBufferingIndicator();
@@ -215,8 +237,10 @@ export function TrackedVideoPlayer({ mediaId, mediaKind, name, nextEpisode, onEn
         }}
         onEncounteredError={({ message }) => {
           clearBufferingTimer();
+          clearSeekWatchdog();
           setBuffering(false);
           setError(message);
+          onFatalError?.(message);
         }}
         onESAdded={({ audio, subtitle }) => {
           setAudioTracks(playableTracks(audio));
@@ -224,17 +248,20 @@ export function TrackedVideoPlayer({ mediaId, mediaKind, name, nextEpisode, onEn
         }}
         onFirstPlay={({ media }) => {
           clearBufferingTimer();
+          clearSeekWatchdog();
           const seconds = Math.max(0, media.length / 1000);
           latestDuration.current = seconds;
           setDuration(seconds);
           setSeekable(media.seekable);
           setBuffering(false);
+          onReady?.();
         }}
         onPaused={() => setPlaying(false)}
         onPictureInPictureStart={() => setPipActive(true)}
         onPictureInPictureStop={() => setPipActive(false)}
         onPlaying={() => {
           clearBufferingTimer();
+          clearSeekWatchdog();
           setPlaying(true);
           setBuffering(false);
           setError(null);
@@ -242,6 +269,7 @@ export function TrackedVideoPlayer({ mediaId, mediaKind, name, nextEpisode, onEn
         onPositionChanged={({ value }) => { latestRatio.current = value; }}
         onStopped={() => {
           clearBufferingTimer();
+          clearSeekWatchdog();
           setPlaying(false);
           setBuffering(false);
           if (latestRatio.current >= 0.98) finishPlayback();
@@ -249,6 +277,7 @@ export function TrackedVideoPlayer({ mediaId, mediaKind, name, nextEpisode, onEn
         }}
         onTimeChanged={({ value }) => {
           clearBufferingTimer();
+          clearSeekWatchdog();
           setBuffering(false);
           const seconds = Math.max(0, value / 1000);
           latestPosition.current = seconds;

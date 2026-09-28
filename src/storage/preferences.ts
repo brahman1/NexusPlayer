@@ -9,6 +9,7 @@ const REDUCE_MOTION_KEY = 'accessibility.reduceMotion';
 const TEXT_SCALE_KEY = 'accessibility.textScale';
 const SUBTITLE_SIZE_KEY = 'subtitles.size';
 const VIDEO_CONTENT_FIT_KEY = 'playback.contentFit';
+const PLAYBACK_ENGINE_PREFIX = 'playback.engine.';
 
 let storage: MMKV | null = null;
 
@@ -51,4 +52,9 @@ export const preferences = {
     return value === 'cover' || value === 'fill' ? value : 'contain';
   },
   setVideoContentFit: (value: 'contain' | 'cover' | 'fill') => getStorage().set(VIDEO_CONTENT_FIT_KEY, value),
+  getPlaybackEngine: (key: string): 'native' | 'vlc' | null => {
+    const value = getStorage().getString(`${PLAYBACK_ENGINE_PREFIX}${key}`);
+    return value === 'native' || value === 'vlc' ? value : null;
+  },
+  setPlaybackEngine: (key: string, value: 'native' | 'vlc') => getStorage().set(`${PLAYBACK_ENGINE_PREFIX}${key}`, value),
 };

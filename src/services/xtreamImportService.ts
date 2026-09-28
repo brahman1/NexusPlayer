@@ -5,6 +5,7 @@ import { deleteCredentials, loadCredentials, saveCredentials } from '../storage/
 import { getDatabase } from '../storage/database';
 import { createId, stableId } from '../utils/ids';
 import { fetchXtreamCatalog, fetchXtreamSeriesEpisodes, normalizeXtreamServer, xtreamMediaUrl } from './xtreamClient';
+import { liveMarkerCandidates } from './playbackStrategy';
 import type { Channel, Playlist, XtreamCredentials } from '../types/domain';
 
 type XtreamAccess = { endpoint: string; credentials: XtreamCredentials };
@@ -66,17 +67,18 @@ export async function refreshXtreamPlaylist(playlist: Playlist) {
   }
 }
 
-export async function resolveXtreamChannel(channel: Channel) {
-  if (!channel.streamUrl.startsWith('xtream://')) return channel;
+export async function resolveXtreamChannel(channel: Channel): Promise<Channel> {
+  return (await resolveXtreamChannelCandidates(channel))[0]!;
+}
+
+export async function resolveXtreamChannelCandidates(channel: Channel): Promise<Channel[]> {
+  if (!channel.streamUrl.startsWith('xtream://')) return [channel];
   const { endpoint, credentials } = await loadXtreamAccess(channel.playlistId);
-  const marker = compatibleLiveMarker(channel.streamUrl, Platform.OS);
-  return { ...channel, streamUrl: xtreamMediaUrl(endpoint, credentials, marker) };
+  return liveMarkerCandidates(channel.streamUrl, Platform.OS).map((marker) => ({ ...channel, streamUrl: xtreamMediaUrl(endpoint, credentials, marker) }));
 }
 
 export function compatibleLiveMarker(marker: string, platform: string) {
-  return platform === 'ios' && /^xtream:\/\/live\/\d+\.ts$/i.test(marker)
-    ? marker.replace(/\.ts$/i, '.m3u8')
-    : marker;
+  return liveMarkerCandidates(marker, platform)[0];
 }
 
 export async function resolveXtreamMedia(playlistId: string, marker: string) {

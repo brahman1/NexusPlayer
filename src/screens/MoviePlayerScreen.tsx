@@ -2,7 +2,7 @@ import { Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text } from 'react-native';
 import { Screen } from '../components/Screen';
-import { TrackedVideoPlayer } from '../components/TrackedVideoPlayer';
+import { AdaptiveVideoPlayer } from '../components/AdaptiveVideoPlayer';
 import { DiscoveryRepository } from '../repositories/DiscoveryRepository';
 import { WatchProgressRepository } from '../repositories/WatchProgressRepository';
 import { resolveXtreamMedia } from '../services/xtreamImportService';
@@ -27,7 +27,7 @@ export function MoviePlayerScreen() {
   }, [id]);
   return <Screen fullscreen={fullscreen}>
     <Stack.Screen options={{ headerShown: !fullscreen, title: media?.name ?? 'Film' }} />
-    {media ? <TrackedVideoPlayer key={media.id} mediaId={media.id} mediaKind="movie" name={media.name} onFullscreenChange={setFullscreen} resumeSeconds={media.resumeSeconds} uri={media.uri} /> : error ? <Text style={styles.error}>{error}</Text> : <ActivityIndicator color={colors.accentStrong} size="large" />}
+    {media ? <AdaptiveVideoPlayer key={media.id} mediaId={media.id} mediaKind="movie" name={media.name} onFullscreenChange={setFullscreen} resumeSeconds={media.resumeSeconds} uri={media.uri} /> : error ? <Text style={styles.error}>{error}</Text> : <ActivityIndicator color={colors.accentStrong} size="large" />}
   </Screen>;
 }
 

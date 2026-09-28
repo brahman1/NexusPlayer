@@ -134,3 +134,19 @@ Le chantier est terminé lorsque Live, films et séries passent par le contrôle
 commun, que la sélection de moteur est invisible pour l’utilisateur, qu’un seek
 ne peut plus rester bloqué indéfiniment et que les objectifs de délai sont validés
 sur au moins un appareil réel de chaque famille ciblée.
+
+## Avancement — 28 septembre 2026
+
+- Réalisé : stratégie commune de sélection natif/VLC par format, plateforme et
+  préférence mémorisée par serveur.
+- Réalisé : films et épisodes adaptatifs avec fallback unique sur erreur ou délai
+  de démarrage, reprise de lecture conservée et moteur gagnant mémorisé.
+- Réalisé : Live avec variantes Xtream HLS/TS, puis fallback vers l’autre moteur.
+- Réalisé : seek VLC déclenché uniquement au relâchement, indicateur retardé et
+  watchdog de 8 secondes empêchant un chargement infini.
+- Réalisé : lecteur natif avec PiP, plein écran, commandes système, reprise,
+  progression et bouton « Épisode suivant ».
+- Validé automatiquement : typecheck, lint, 73 tests, bundle iOS et bundle
+  Android TV.
+- À valider sur appareils réels : délais première image/seek, codecs atypiques,
+  pistes multiples, PiP et bascule automatique avec les sources de test autorisées.
