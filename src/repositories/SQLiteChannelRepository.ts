@@ -1,5 +1,7 @@
 import { getDatabase } from '../storage/database';
 import type { Category, Channel } from '../types/domain';
+import { localizeCategoryDisplayName, localizePresentationName } from '../services/channelPresentation';
+import { getAppLanguage } from '../i18n';
 
 type ChannelRow = {
   id: string;
@@ -26,11 +28,13 @@ export type ChannelFilters = {
   categoryIds?: string[];
   favoritesOnly?: boolean;
   recentOnly?: boolean;
+  countries?: string[];
+  languages?: string[];
   limit?: number;
   offset?: number;
 };
 
-function buildFilterQuery(playlistId: string, filters: ChannelFilters) {
+export function buildFilterQuery(playlistId: string, filters: ChannelFilters) {
   const clauses = ['playlist_id = ?'];
   const parameters: (string | number)[] = [playlistId];
   const search = filters.search?.trim();
@@ -50,6 +54,14 @@ function buildFilterQuery(playlistId: string, filters: ChannelFilters) {
   }
   if (filters.favoritesOnly) clauses.push('is_favorite = 1');
   if (filters.recentOnly) clauses.push('last_watched_at IS NOT NULL');
+  if (filters.countries?.length) {
+    clauses.push(`country IN (${filters.countries.map(() => '?').join(', ')})`);
+    parameters.push(...filters.countries);
+  }
+  if (filters.languages?.length) {
+    clauses.push(`language IN (${filters.languages.map(() => '?').join(', ')})`);
+    parameters.push(...filters.languages);
+  }
 
   return { where: clauses.join(' AND '), parameters };
 }
@@ -60,7 +72,7 @@ function mapChannel(row: ChannelRow): Channel {
     playlistId: row.playlist_id,
     categoryId: row.category_id,
     name: row.name,
-    displayName: row.display_name || row.name,
+    displayName: localizePresentationName(row.display_name || row.name, getAppLanguage()),
     streamUrl: row.stream_url,
     tvgId: row.tvg_id,
     tvgName: row.tvg_name,
@@ -73,23 +85,24 @@ function mapChannel(row: ChannelRow): Channel {
 }
 
 export class SQLiteChannelRepository {
-  async listCategories(playlistId: string) {
+  async listCategories(playlistId: string, raw = false) {
     const database = await getDatabase();
+    const label = raw ? 'c.name' : 'c.display_name';
     const rows = await database.getAllAsync<CategoryRow>(
-      `SELECT MIN(c.id) AS id, c.playlist_id, MIN(c.name) AS name, c.display_name,
+      `SELECT MIN(c.id) AS id, c.playlist_id, MIN(c.name) AS name, ${label} AS display_name,
               MIN(c.position) AS position, COUNT(ch.id) AS channel_count,
               GROUP_CONCAT(DISTINCT c.id) AS category_ids
        FROM categories c LEFT JOIN channels ch ON ch.category_id = c.id
        WHERE c.playlist_id = ? AND c.kind = 'live'
-       GROUP BY c.playlist_id, c.display_name HAVING COUNT(ch.id) > 0
-       ORDER BY MIN(c.sort_name) COLLATE NOCASE, c.display_name COLLATE NOCASE`,
+       GROUP BY c.playlist_id, ${label} HAVING COUNT(ch.id) > 0
+       ORDER BY MIN(c.sort_name) COLLATE NOCASE, ${label} COLLATE NOCASE`,
       playlistId,
     );
     return rows.map((row) => ({
       id: row.id,
       playlistId: row.playlist_id,
       name: row.name,
-      displayName: row.display_name || row.name,
+      displayName: raw ? (row.display_name || row.name) : localizeCategoryDisplayName(row.display_name || row.name, getAppLanguage()),
       kind: 'live' as const,
       position: row.position,
       channelCount: row.channel_count,

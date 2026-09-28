@@ -2,6 +2,7 @@ import * as SQLite from 'expo-sqlite';
 
 import { categoryDisplayName, categorySortKey, channelDisplayName, episodeDisplayName, inferChannelMetadata, mediaDisplayName, naturalSortKey, type CategoryKind } from '../services/channelPresentation';
 import { DATABASE_VERSION, migrationV1, migrationV2, migrationV3, migrationV4, migrationV5, migrationV6, migrationV7, migrationV8, migrationV9, migrationV10 } from './migrations';
+import { translate } from '../i18n';
 
 const DATABASE_NAME = 'nexusplayer.db';
 
@@ -62,7 +63,7 @@ async function migrate(database: SQLite.SQLiteDatabase) {
 
   if (currentVersion > DATABASE_VERSION) {
     throw new Error(
-      `La base locale utilise une version plus récente (${currentVersion}) que l’application (${DATABASE_VERSION}).`,
+      translate(`La base locale utilise une version plus récente (${currentVersion}) que l’application (${DATABASE_VERSION}).`, `The local database uses a newer version (${currentVersion}) than the application (${DATABASE_VERSION}).`),
     );
   }
 

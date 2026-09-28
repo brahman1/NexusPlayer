@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { type Href, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 
@@ -11,6 +11,9 @@ import { buildChannelCategoryHierarchy } from '../services/channelCategoryHierar
 import { preferences } from '../storage/preferences';
 import { colors, radii, spacing } from '../theme/tokens';
 import type { Channel } from '../types/domain';
+import { useI18n } from '../i18n';
+import { applyCategoryLabelOverride } from '../services/channelPresentation';
+import { invalidateCatalogData } from '../services/catalogInvalidation';
 
 const repository = new SQLiteChannelRepository();
 const epgRepository = new EpgRepository();
@@ -36,6 +39,7 @@ function ChannelLogo({ channel }: { channel: Channel }) {
 }
 
 export function ChannelListScreen() {
+  const { language, tx } = useI18n();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { width } = useWindowDimensions();
@@ -54,6 +58,13 @@ export function ChannelListScreen() {
   const [error, setError] = useState<string | null>(null);
   const [focusedChannel, setFocusedChannel] = useState<Channel | null>(null);
   const [programmes, setProgrammes] = useState<Awaited<ReturnType<EpgRepository['nowNext']>>>([]);
+  const [preferenceFilterActive, setPreferenceFilterActive] = useState(false);
+  const [preferredCountries, setPreferredCountries] = useState(preferences.getPreferredCountries());
+  const [preferredLanguages, setPreferredLanguages] = useState(preferences.getPreferredLanguages());
+  const [showRawCategories, setShowRawCategories] = useState(preferences.getShowRawCategories());
+  const [categoryOverrides, setCategoryOverrides] = useState(preferences.getCategoryLabelOverrides());
+  const [editingCategory, setEditingCategory] = useState(false);
+  const [categoryName, setCategoryName] = useState('');
   const requestVersion = useRef(0);
   const loadingMoreRef = useRef(false);
   const listRef = useRef<FlatList<Channel>>(null);
@@ -64,7 +75,18 @@ export function ChannelListScreen() {
   const selectedCategoryIds = useMemo(() => countryFilter
     ? selectedThemeGroup?.countries.find((group) => group.country === countryFilter)?.categoryIds
     : selectedThemeGroup?.categoryIds, [countryFilter, selectedThemeGroup]);
-  const categoryNamesById = useMemo(() => new Map(categories.flatMap((category) => category.categoryIds.map((categoryId) => [categoryId, category.displayName] as const))), [categories]);
+  const categoryNamesById = useMemo(() => new Map(categories.flatMap((category) => category.categoryIds.map((categoryId) => [categoryId, applyCategoryLabelOverride(category.displayName, categoryOverrides)] as const))), [categories, categoryOverrides]);
+  const hasContentPreferences = preferredCountries.length + preferredLanguages.length > 0;
+  const displayTheme = useCallback((theme: string) => categoryOverrides[theme] ?? theme, [categoryOverrides]);
+  useFocusEffect(useCallback(() => {
+    const countries = preferences.getPreferredCountries();
+    const languages = preferences.getPreferredLanguages();
+    setPreferredCountries(countries);
+    setPreferredLanguages(languages);
+    if (countries.length + languages.length === 0) setPreferenceFilterActive(false);
+    setShowRawCategories(preferences.getShowRawCategories());
+    setCategoryOverrides(preferences.getCategoryLabelOverrides());
+  }, []));
 
   const loadChannels = useCallback(async () => {
     if (!id) return;
@@ -74,6 +96,8 @@ export function ChannelListScreen() {
       categoryIds: selectedCategoryIds,
       favoritesOnly: filter === 'favorites',
       recentOnly: filter === 'recent',
+      countries: preferenceFilterActive ? preferredCountries : undefined,
+      languages: preferenceFilterActive ? preferredLanguages : undefined,
     };
     try {
       setError(null);
@@ -92,11 +116,11 @@ export function ChannelListScreen() {
       setTotalCount(total);
     } catch (caught) {
       if (version !== requestVersion.current) return;
-      setError(caught instanceof Error ? caught.message : 'Chargement impossible.');
+      setError(caught instanceof Error ? caught.message : tx('Chargement impossible.', 'Unable to load.'));
     } finally {
       if (version === requestVersion.current) setLoading(false);
     }
-  }, [filter, id, search, selectedCategoryIds]);
+  }, [filter, id, preferenceFilterActive, preferredCountries, preferredLanguages, search, selectedCategoryIds, tx]);
 
   const loadMore = useCallback(async () => {
     if (!id || loading || loadingMoreRef.current || channels.length >= totalCount) return;
@@ -109,6 +133,8 @@ export function ChannelListScreen() {
         categoryIds: selectedCategoryIds,
         favoritesOnly: filter === 'favorites',
         recentOnly: filter === 'recent',
+        countries: preferenceFilterActive ? preferredCountries : undefined,
+        languages: preferenceFilterActive ? preferredLanguages : undefined,
         limit: PAGE_SIZE,
         offset: loadedOffset + channels.length,
       });
@@ -117,13 +143,13 @@ export function ChannelListScreen() {
       }
     } catch (caught) {
       if (version === requestVersion.current) {
-        setError(caught instanceof Error ? caught.message : 'Chargement de la suite impossible.');
+        setError(caught instanceof Error ? caught.message : tx('Chargement de la suite impossible.', 'Unable to load more channels.'));
       }
     } finally {
       loadingMoreRef.current = false;
       if (version === requestVersion.current) setLoadingMore(false);
     }
-  }, [channels.length, filter, id, loadedOffset, loading, search, selectedCategoryIds, totalCount]);
+  }, [channels.length, filter, id, loadedOffset, loading, preferenceFilterActive, preferredCountries, preferredLanguages, search, selectedCategoryIds, totalCount, tx]);
 
   const loadPrevious = useCallback(async () => {
     if (!id || loading || loadingMoreRef.current || loadedOffset <= 0) return;
@@ -137,6 +163,8 @@ export function ChannelListScreen() {
         categoryIds: selectedCategoryIds,
         favoritesOnly: filter === 'favorites',
         recentOnly: filter === 'recent',
+        countries: preferenceFilterActive ? preferredCountries : undefined,
+        languages: preferenceFilterActive ? preferredLanguages : undefined,
         limit: loadedOffset - offset,
         offset,
       });
@@ -145,17 +173,34 @@ export function ChannelListScreen() {
         setLoadedOffset(offset);
       }
     } catch (caught) {
-      if (version === requestVersion.current) setError(caught instanceof Error ? caught.message : 'Chargement des chaînes précédentes impossible.');
+      if (version === requestVersion.current) setError(caught instanceof Error ? caught.message : tx('Chargement des chaînes précédentes impossible.', 'Unable to load previous channels.'));
     } finally {
       loadingMoreRef.current = false;
       if (version === requestVersion.current) setLoadingMore(false);
     }
-  }, [filter, id, loadedOffset, loading, search, selectedCategoryIds]);
+  }, [filter, id, loadedOffset, loading, preferenceFilterActive, preferredCountries, preferredLanguages, search, selectedCategoryIds, tx]);
 
   useEffect(() => {
     if (!id) return;
-    repository.listCategories(id).then(setCategories).catch(() => setCategories([]));
-  }, [id]);
+    repository.listCategories(id, showRawCategories).then(setCategories).catch(() => setCategories([]));
+  }, [id, language, showRawCategories]);
+
+  const saveCategoryName = () => {
+    if (!selectedTheme) return;
+    const value = categoryName.trim();
+    preferences.setCategoryLabelOverride(selectedTheme, value || null);
+    setCategoryOverrides(preferences.getCategoryLabelOverrides());
+    invalidateCatalogData();
+    setEditingCategory(false);
+  };
+
+  const toggleRawCategories = () => {
+    const next = !showRawCategories;
+    preferences.setShowRawCategories(next);
+    invalidateCatalogData();
+    setShowRawCategories(next);
+    setFilter('all'); setCountryFilter(null);
+  };
 
   useEffect(() => {
     if (!focusedChannel) return;
@@ -192,12 +237,13 @@ export function ChannelListScreen() {
     <Screen navigation>
       <View style={[styles.container, compact && styles.containerCompact]}>
         <View style={[styles.heading, compact && styles.headingCompact]}>
-          <Text style={[styles.title, compact && styles.titleCompact]}>Chaînes</Text>
-          {!loading && <Text style={styles.resultCount}>{totalCount} résultats</Text>}
+          <Text style={[styles.title, compact && styles.titleCompact]}>{tx('Chaînes', 'Channels')}</Text>
+          {!loading && <Text style={styles.resultCount}>{tx(`${totalCount} résultats`, `${totalCount} results`)}</Text>}
         </View>
         <TextInput
           onChangeText={setSearch}
-          placeholder="Rechercher une chaîne"
+          accessibilityLabel={tx('Rechercher une chaîne', 'Search for a channel')}
+          placeholder={tx('Rechercher une chaîne', 'Search for a channel')}
           placeholderTextColor={colors.textMuted}
           style={styles.search}
           value={search}
@@ -208,23 +254,27 @@ export function ChannelListScreen() {
           showsHorizontalScrollIndicator={false}
           style={styles.filterScroller}
         >
-          <FilterButton active={filter === 'all'} label="Toutes" onPress={() => { setFilter('all'); setCountryFilter(null); }} />
-          <FilterButton active={filter === 'favorites'} label="Favoris" onPress={() => { setFilter('favorites'); setCountryFilter(null); }} />
-          <FilterButton active={filter === 'recent'} label="Récentes" onPress={() => { setFilter('recent'); setCountryFilter(null); }} />
+          <FilterButton active={filter === 'all'} label={tx('Toutes', 'All')} onPress={() => { setFilter('all'); setCountryFilter(null); }} />
+          <FilterButton active={filter === 'favorites'} label={tx('Favoris', 'Favorites')} onPress={() => { setFilter('favorites'); setCountryFilter(null); }} />
+          <FilterButton active={filter === 'recent'} label={tx('Récentes', 'Recent')} onPress={() => { setFilter('recent'); setCountryFilter(null); }} />
+          {hasContentPreferences && <FilterButton active={preferenceFilterActive} label={tx('Mes pays/langues', 'My countries/languages')} onPress={() => setPreferenceFilterActive((value) => !value)} />}
+          <FilterButton active={showRawCategories} label={showRawCategories ? tx('Classement brut', 'Raw categories') : tx('Classement simplifié', 'Simplified categories')} onPress={toggleRawCategories} />
+          <FilterButton active={false} label={tx('Personnaliser', 'Customize')} onPress={() => router.push('/(tabs)/content-preferences' as Href)} />
           {categoryHierarchy.map((group) => (
             <FilterButton
               active={selectedTheme === group.theme}
               key={group.theme}
-              label={`${group.theme} (${group.count})`}
+              label={`${displayTheme(group.theme)} (${group.count})`}
               onPress={() => { setFilter(`${THEME_PREFIX}${group.theme}`); setCountryFilter(null); }}
             />
           ))}
         </ScrollView>
         {selectedThemeGroup && selectedThemeGroup.countries.length > 0 && (
           <View style={styles.countrySection}>
-            <Text style={styles.countryTitle}>{selectedThemeGroup.theme} · choisir un pays</Text>
+            <View style={styles.countryHeading}><Text style={styles.countryTitle}>{displayTheme(selectedThemeGroup.theme)} · {tx('choisir un pays', 'choose a country')}</Text><FilterButton active={editingCategory} label={tx('Renommer', 'Rename')} onPress={() => { setCategoryName(displayTheme(selectedThemeGroup.theme)); setEditingCategory((value) => !value); }} /></View>
+            {editingCategory && <View style={styles.renameRow}><TextInput accessibilityLabel={tx('Nom personnalisé de la catégorie', 'Custom category name')} autoFocus maxLength={40} onChangeText={setCategoryName} onSubmitEditing={saveCategoryName} placeholder={selectedThemeGroup.theme} placeholderTextColor={colors.textMuted} style={styles.renameInput} value={categoryName} /><FilterButton active label={tx('Enregistrer', 'Save')} onPress={saveCategoryName} /><FilterButton active={false} label={tx('Rétablir', 'Restore')} onPress={() => { setCategoryName(''); preferences.setCategoryLabelOverride(selectedThemeGroup.theme, null); setCategoryOverrides(preferences.getCategoryLabelOverrides()); invalidateCatalogData(); setEditingCategory(false); }} /></View>}
             <ScrollView contentContainerStyle={styles.countryFilters} horizontal showsHorizontalScrollIndicator={false}>
-              <FilterButton active={countryFilter === null} label={`Tous les pays (${selectedThemeGroup.count})`} onPress={() => setCountryFilter(null)} />
+              <FilterButton active={countryFilter === null} label={`${tx('Tous les pays', 'All countries')} (${selectedThemeGroup.count})`} onPress={() => setCountryFilter(null)} />
               {selectedThemeGroup.countries.map((country) => (
                 <FilterButton active={countryFilter === country.country} key={country.country} label={`${country.country} (${country.count})`} onPress={() => setCountryFilter(country.country)} />
               ))}
@@ -235,7 +285,7 @@ export function ChannelListScreen() {
         {loading ? <ActivityIndicator color={colors.accentStrong} /> : (
           <View style={styles.body}>
           <FlatList
-            accessibilityLabel={`${channels.length} chaînes chargées sur ${totalCount}`}
+            accessibilityLabel={tx(`${channels.length} chaînes chargées sur ${totalCount}`, `${channels.length} of ${totalCount} channels loaded`)}
             contentContainerStyle={styles.list}
             data={channels}
             getItemLayout={(_, index) => ({ index, length: ROW_STRIDE, offset: ROW_STRIDE * index })}
@@ -261,11 +311,11 @@ export function ChannelListScreen() {
                   <ChannelLogo channel={item} />
                   <View style={styles.channelText}>
                     <Text numberOfLines={1} style={styles.channelName}>{item.displayName}</Text>
-                    <Text numberOfLines={1} style={styles.meta}>{[item.categoryId ? categoryNamesById.get(item.categoryId) : null, item.country, item.language].filter(Boolean).join(' · ') || 'En direct'}</Text>
+                    <Text numberOfLines={1} style={styles.meta}>{[item.categoryId ? categoryNamesById.get(item.categoryId) : null, item.country, item.language].filter(Boolean).join(' · ') || tx('En direct', 'Live')}</Text>
                   </View>
                 </FocusableCard>
                 <FocusableCard
-                  accessibilityLabel={item.isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+                  accessibilityLabel={item.isFavorite ? tx('Retirer des favoris', 'Remove from favorites') : tx('Ajouter aux favoris', 'Add to favorites')}
                   onPress={() => void toggleFavorite(item)}
                   style={styles.favoriteButton}
                 >
@@ -280,14 +330,14 @@ export function ChannelListScreen() {
           {showPreview && focusedChannel && <View style={styles.preview}>
             <ChannelLogo channel={focusedChannel} />
             <Text numberOfLines={2} style={styles.previewTitle}>{focusedChannel.displayName}</Text>
-            <Text style={styles.liveBadge}>● EN DIRECT</Text>
-            {programmes[0] ? <><Text style={styles.epgLabel}>MAINTENANT</Text><Text numberOfLines={2} style={styles.epgTitle}>{programmes[0].title}</Text></> : <Text style={styles.previewMeta}>Aucune donnée EPG disponible.</Text>}
-            {programmes[1] && <><Text style={styles.epgLabel}>ENSUITE</Text><Text numberOfLines={2} style={styles.previewMeta}>{programmes[1].title}</Text></>}
-            <Text style={styles.previewHint}>OK pour regarder · ★ pour ajouter aux favoris</Text>
+            <Text style={styles.liveBadge}>{tx('● EN DIRECT', '● LIVE')}</Text>
+            {programmes[0] ? <><Text style={styles.epgLabel}>{tx('MAINTENANT', 'NOW')}</Text><Text numberOfLines={2} style={styles.epgTitle}>{programmes[0].title}</Text></> : <Text style={styles.previewMeta}>{tx('Aucune donnée EPG disponible.', 'No EPG data available.')}</Text>}
+            {programmes[1] && <><Text style={styles.epgLabel}>{tx('ENSUITE', 'NEXT')}</Text><Text numberOfLines={2} style={styles.previewMeta}>{programmes[1].title}</Text></>}
+            <Text style={styles.previewHint}>{tx('OK pour regarder · ★ pour ajouter aux favoris', 'OK to watch · ★ to add to favorites')}</Text>
           </View>}
           </View>
         )}
-        {!loading && channels.length === 0 && <Text style={styles.empty}>Aucune chaîne trouvée.</Text>}
+        {!loading && channels.length === 0 && <Text style={styles.empty}>{tx('Aucune chaîne trouvée.', 'No channels found.')}</Text>}
         {error && <Text style={styles.error}>{error}</Text>}
       </View>
     </Screen>
@@ -306,8 +356,11 @@ const styles = StyleSheet.create({
   filterScroller: { flexGrow: 0, flexShrink: 0, height: 70 },
   filters: { alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm },
   countrySection: { gap: spacing.xs, marginBottom: spacing.sm },
+  countryHeading: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, justifyContent: 'space-between' },
   countryTitle: { color: colors.textMuted, fontSize: 12, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase' },
   countryFilters: { alignItems: 'center', gap: spacing.sm, paddingBottom: spacing.sm },
+  renameRow: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  renameInput: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radii.md, borderWidth: 1, color: colors.text, flex: 1, fontSize: 15, minHeight: 46, minWidth: 190, paddingHorizontal: spacing.md },
   filterButton: { minHeight: 46, minWidth: 110, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   filterActive: { backgroundColor: colors.accent, borderColor: colors.accentStrong },
   filterLabel: { color: colors.textMuted, fontSize: 14, fontWeight: '700' },

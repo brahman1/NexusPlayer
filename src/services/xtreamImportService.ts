@@ -8,6 +8,7 @@ import { fetchXtreamCatalog, fetchXtreamSeriesEpisodes, normalizeXtreamServer, x
 import { liveMarkerCandidates } from './playbackStrategy';
 import type { Channel, Playlist, XtreamCredentials } from '../types/domain';
 import { episodeDisplayName, naturalSortKey } from './channelPresentation';
+import { translate } from '../i18n';
 
 type XtreamAccess = { endpoint: string; credentials: XtreamCredentials };
 const xtreamAccessCache = new Map<string, Promise<XtreamAccess>>();
@@ -25,7 +26,7 @@ async function loadXtreamAccess(playlistId: string): Promise<XtreamAccess> {
     getDatabase().then((database) => database.getFirstAsync<{ endpoint: string }>('SELECT endpoint FROM playlists WHERE id = ?', playlistId)),
     loadCredentials(playlistId),
   ]).then(([source, credentials]) => {
-    if (!source?.endpoint || !credentials || !('username' in credentials)) throw new Error('Identifiants Xtream indisponibles sur cet appareil.');
+    if (!source?.endpoint || !credentials || !('username' in credentials)) throw new Error(translate('Identifiants Xtream indisponibles sur cet appareil.', 'Xtream credentials are unavailable on this device.'));
     return { endpoint: source.endpoint, credentials };
   }).catch((error) => {
     xtreamAccessCache.delete(playlistId);
@@ -46,9 +47,9 @@ export async function importXtream(name: string, serverUrl: string, credentials:
 }
 
 export async function refreshXtreamPlaylist(playlist: Playlist) {
-  if (playlist.sourceKind !== 'xtream' || !playlist.endpoint) throw new Error('Cette source Xtream ne peut pas être actualisée.');
+  if (playlist.sourceKind !== 'xtream' || !playlist.endpoint) throw new Error(translate('Cette source Xtream ne peut pas être actualisée.', 'This Xtream source cannot be refreshed.'));
   const credentials = await loadCredentials(playlist.id);
-  if (!credentials || !('username' in credentials)) throw new Error('Identifiants Xtream indisponibles sur cet appareil.');
+  if (!credentials || !('username' in credentials)) throw new Error(translate('Identifiants Xtream indisponibles sur cet appareil.', 'Xtream credentials are unavailable on this device.'));
   const database = await getDatabase();
   await database.runAsync(`UPDATE playlists SET sync_status = 'syncing', last_error = NULL WHERE id = ?`, playlist.id);
   try {
@@ -65,7 +66,7 @@ export async function refreshXtreamPlaylist(playlist: Playlist) {
     }
     return await syncXtreamCatalog(playlist.id, catalog, episodeCatalogs);
   } catch (error) {
-    await database.runAsync(`UPDATE playlists SET sync_status = 'error', last_error = ? WHERE id = ?`, 'Synchronisation Xtream impossible. Le dernier catalogue valide a été conservé.', playlist.id);
+    await database.runAsync(`UPDATE playlists SET sync_status = 'error', last_error = ? WHERE id = ?`, translate('Synchronisation Xtream impossible. Le dernier catalogue valide a été conservé.', 'Unable to sync Xtream. The latest valid catalog was kept.'), playlist.id);
     throw error;
   }
 }
@@ -109,7 +110,7 @@ export async function syncXtreamSeriesEpisodes(seriesId: string) {
   const source = await database.getFirstAsync<{ playlist_id: string; external_id: string | null; endpoint: string }>(`SELECT s.playlist_id, s.external_id, p.endpoint FROM series s JOIN playlists p ON p.id = s.playlist_id WHERE s.id = ?`, seriesId);
   if (!source) return 0;
   const credentials = await loadCredentials(source.playlist_id);
-  if (!credentials || !('username' in credentials)) throw new Error('Identifiants Xtream indisponibles sur cet appareil.');
+  if (!credentials || !('username' in credentials)) throw new Error(translate('Identifiants Xtream indisponibles sur cet appareil.', 'Xtream credentials are unavailable on this device.'));
   let externalId = source.external_id;
   if (!externalId) {
     const catalog = await fetchXtreamCatalog(source.endpoint, credentials);

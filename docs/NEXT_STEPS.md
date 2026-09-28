@@ -567,8 +567,23 @@ fonction majeure avant la validation des lots 1 à 5.
   les autres pays ; le reste du catalogue demeure accessible.
 - La migration SQLite V10 reclasse également les sources déjà présentes.
 
-Prochain lot : écran de préférences pays/langues par profil, filtres visibles,
-corrections manuelles et conservation facultative de la vue brute du fournisseur.
+## Classement mondial des contenus — lot 2 réalisé le 28 septembre 2026
+
+- Un écran bilingue et adaptatif permet de choisir plusieurs pays et langues
+  préférés à partir des métadonnées réellement présentes dans les sources.
+- Le Live propose un filtre rapide « Mes pays/langues » sans masquer définitivement
+  le reste du catalogue.
+- Les pays préférés remontent en premier dans les rayons Films/Séries et un accès
+  direct permet d'afficher uniquement les catégories correspondantes.
+- L'utilisateur peut basculer entre le classement simplifié de NexusPlayer et les
+  catégories brutes du fournisseur pour diagnostiquer une source particulière.
+- Les intitulés de catégories Live peuvent être renommés ou restaurés localement,
+  sans modifier les données originales du fournisseur.
+- Ces choix sont persistants, appliqués en français et en anglais, et l'interface
+  s'adapte au téléphone, à la tablette et aux téléviseurs pilotés au D-pad.
+
+Prochain lot : profils utilisateur et synchronisation sécurisée des préférences
+entre appareils, sans dépendre d'une adresse MAC.
 
 ### Navigation Live et compatibilité Xtream
 

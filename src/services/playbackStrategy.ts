@@ -1,3 +1,5 @@
+import { translate } from '../i18n';
+
 export type PlaybackEngine = 'native' | 'vlc';
 export type PlaybackKind = 'live' | 'movie' | 'episode';
 
@@ -46,7 +48,7 @@ export function redactPlaybackUri(uri: string) {
     const file = segments.at(-1) ?? '';
     return `${url.protocol}//${url.host}/…/${file}`;
   } catch {
-    return 'adresse multimédia masquée';
+    return translate('adresse multimédia masquée', 'hidden media address');
   }
 }
 

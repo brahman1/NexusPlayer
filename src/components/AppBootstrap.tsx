@@ -3,13 +3,17 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, AppState, type NativeEventSubscription, StyleSheet, Text, View } from 'react-native';
 
 import { runAutomaticSourceSync } from '../services/automaticSourceSync';
+import { initializeAppLanguage, useI18n } from '../i18n';
 import { initializeDatabase } from '../storage/database';
+import { preferences } from '../storage/preferences';
 import { colors, spacing } from '../theme/tokens';
 import { PrimaryButton } from './PrimaryButton';
 
 type BootstrapStatus = 'loading' | 'ready' | 'error';
 
 export function AppBootstrap({ children }: PropsWithChildren) {
+  initializeAppLanguage(preferences.getLanguage());
+  const { tx } = useI18n();
   const [status, setStatus] = useState<BootstrapStatus>('loading');
 
   useEffect(() => {
@@ -63,15 +67,15 @@ export function AppBootstrap({ children }: PropsWithChildren) {
       {status === 'loading' ? (
         <>
           <ActivityIndicator color={colors.accent} size="large" />
-          <Text style={styles.message}>Préparation de NexusPlayer…</Text>
+          <Text style={styles.message}>{tx('Préparation de NexusPlayer…', 'Preparing NexusPlayer…')}</Text>
         </>
       ) : (
         <>
-          <Text style={styles.title}>Impossible d’ouvrir les données locales</Text>
+          <Text style={styles.title}>{tx('Impossible d’ouvrir les données locales', 'Unable to open local data')}</Text>
           <Text style={styles.message}>
-            Vos données n’ont pas été supprimées. Réessayez l’initialisation.
+            {tx('Vos données n’ont pas été supprimées. Réessayez l’initialisation.', 'Your data has not been deleted. Try initializing again.')}
           </Text>
-          <PrimaryButton autoFocus label="Réessayer" onPress={() => void retry()} />
+          <PrimaryButton autoFocus label={tx('Réessayer', 'Try again')} onPress={() => void retry()} />
         </>
       )}
     </View>

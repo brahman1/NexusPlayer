@@ -1,4 +1,5 @@
 import { getDatabase } from '../storage/database';
+import { translate } from '../i18n';
 import type { Channel, Movie, Series } from '../types/domain';
 
 type ChannelRow = { id: string; playlist_id: string; category_id: string | null; name: string; display_name: string; stream_url: string; tvg_id: string | null; tvg_name: string | null; logo_url: string | null; language: string | null; country: string | null; is_favorite: number; last_watched_at: string | null };
@@ -45,6 +46,6 @@ export class DiscoveryRepository {
       db.getAllAsync<{ id: string; title: string; subtitle: string | null }>(`SELECT id, COALESCE(NULLIF(display_name, ''), name) AS title, plot AS subtitle FROM movies WHERE name LIKE ? ESCAPE '\\' OR display_name LIKE ? ESCAPE '\\' ORDER BY sort_name COLLATE NOCASE LIMIT 20`, term, term),
       db.getAllAsync<{ id: string; title: string; subtitle: string | null }>(`SELECT id, COALESCE(NULLIF(display_name, ''), name) AS title, plot AS subtitle FROM series WHERE name LIKE ? ESCAPE '\\' OR display_name LIKE ? ESCAPE '\\' ORDER BY sort_name COLLATE NOCASE LIMIT 20`, term, term),
     ]);
-    return [...channels.map((x) => ({ ...x, subtitle: 'Chaîne en direct', kind: 'channel' as const })), ...programmes.map((x) => ({ ...x, kind: 'programme' as const })), ...movies.map((x) => ({ ...x, kind: 'movie' as const })), ...series.map((x) => ({ ...x, kind: 'series' as const }))];
+    return [...channels.map((x) => ({ ...x, subtitle: translate('Chaîne en direct', 'Live channel'), kind: 'channel' as const })), ...programmes.map((x) => ({ ...x, kind: 'programme' as const })), ...movies.map((x) => ({ ...x, kind: 'movie' as const })), ...series.map((x) => ({ ...x, kind: 'series' as const }))];
   }
 }

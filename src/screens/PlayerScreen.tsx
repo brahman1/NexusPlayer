@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
+  Pressable,
   StyleSheet,
   Text,
   useTVEventHandler,
@@ -24,6 +25,7 @@ import { resolveXtreamChannel, resolveXtreamChannelCandidates } from '../service
 import { alternateEngine, engineOrder, playbackPreferenceKey, type PlaybackEngine } from '../services/playbackStrategy';
 import { preferences } from '../storage/preferences';
 import { usePlaybackActivity } from '../hooks/usePlaybackActivity';
+import { translate, useI18n } from '../i18n';
 import { colors, radii, spacing } from '../theme/tokens';
 import type { Channel } from '../types/domain';
 
@@ -38,11 +40,11 @@ function sourceForChannel(channel: Channel): VideoSource {
 }
 
 function mediaTrackLabel(track: AudioTrack | SubtitleTrack) {
-  return track.label || track.name || track.language || 'Piste';
+  return track.label || track.name || track.language || translate('Piste', 'Track');
 }
 
 function videoTrackLabel(track: VideoTrack) {
-  const resolution = track.size.height ? `${track.size.height}p` : 'Qualité';
+  const resolution = track.size.height ? `${track.size.height}p` : translate('Qualité', 'Quality');
   const bitrate = track.peakBitrate ? ` · ${Math.round(track.peakBitrate / 1_000)} kb/s` : '';
   return `${resolution}${bitrate}`;
 }
@@ -72,6 +74,7 @@ function PlayerSurface({ channel, fullscreen, onAutomaticRetry, onEngineFailure,
   onEngineReady?: () => void;
   onFullscreenChange: (fullscreen: boolean) => void;
 }) {
+  const { tx } = useI18n();
   const player = useVideoPlayer(sourceForChannel(channel), (instance) => {
     instance.timeUpdateEventInterval = 0.5;
     instance.bufferOptions = {
@@ -142,7 +145,7 @@ function PlayerSurface({ channel, fullscreen, onAutomaticRetry, onEngineFailure,
         {status === 'loading' && activity.buffering && (
           <View pointerEvents="none" style={styles.loadingOverlay}>
             <ActivityIndicator color={colors.accentStrong} size="large" />
-            <Text style={styles.loadingText}>Connexion au flux…</Text>
+            <Text style={styles.loadingText}>{tx('Connexion au flux…', 'Connecting to stream…')}</Text>
           </View>
         )}
       </View>
@@ -150,34 +153,35 @@ function PlayerSurface({ channel, fullscreen, onAutomaticRetry, onEngineFailure,
         <View accessibilityRole="alert" style={styles.problem}>
           <Text style={styles.problemTitle}>{problem.title}</Text>
           <Text style={styles.problemDetail}>{problem.detail}</Text>
-          {reconnectPending && <Text style={styles.reconnect}>Nouvelle tentative {retryAttempt + 1}/{MAX_LIVE_RECONNECT_ATTEMPTS} dans {liveReconnectDelay(retryAttempt) / 1000} s…</Text>}
-          <PlayerAction label="Réessayer" onPress={onRetry} />
-          {reconnectPending && <PlayerAction label="Annuler la reconnexion" onPress={() => setAutoReconnectEnabled(false)} />}
+          {reconnectPending && <Text style={styles.reconnect}>{tx(`Nouvelle tentative ${retryAttempt + 1}/${MAX_LIVE_RECONNECT_ATTEMPTS} dans ${liveReconnectDelay(retryAttempt) / 1000} s…`, `Retry ${retryAttempt + 1}/${MAX_LIVE_RECONNECT_ATTEMPTS} in ${liveReconnectDelay(retryAttempt) / 1000}s…`)}</Text>}
+          <PlayerAction label={tx('Réessayer', 'Try again')} onPress={onRetry} />
+          {reconnectPending && <PlayerAction label={tx('Annuler la reconnexion', 'Cancel reconnection')} onPress={() => setAutoReconnectEnabled(false)} />}
         </View>
       )}
       {showSettings && <View style={styles.panel}>
-        <Text style={styles.panelTitle}>Options de lecture</Text>
+        <Text style={styles.panelTitle}>{tx('Options de lecture', 'Playback options')}</Text>
         <Text style={styles.optionTitle}>Audio</Text>
         <View style={styles.optionRow}>{audioTracks.length ? audioTracks.map((track, index) => {
           const label = mediaTrackLabel(track);
           return <PlayerAction key={`${track.id ?? track.language}:${index}`} label={`${selectedAudio === label ? '✓ ' : ''}${label}`} onPress={() => { applyAudioTrack(player, track); setSelectedAudio(label); }} />;
-        }) : <Text style={styles.diagnostic}>Aucune piste audio alternative annoncée.</Text>}</View>
-        <Text style={styles.optionTitle}>Sous-titres</Text>
-        <View style={styles.optionRow}><PlayerAction label={`${selectedSubtitle === null ? '✓ ' : ''}Désactivés`} onPress={() => { applySubtitleTrack(player, null); setSelectedSubtitle(null); }} />{subtitleTracks.map((track, index) => {
+        }) : <Text style={styles.diagnostic}>{tx('Aucune piste audio alternative annoncée.', 'No alternative audio track available.')}</Text>}</View>
+        <Text style={styles.optionTitle}>{tx('Sous-titres', 'Subtitles')}</Text>
+        <View style={styles.optionRow}><PlayerAction label={`${selectedSubtitle === null ? '✓ ' : ''}${tx('Désactivés', 'Off')}`} onPress={() => { applySubtitleTrack(player, null); setSelectedSubtitle(null); }} />{subtitleTracks.map((track, index) => {
           const label = mediaTrackLabel(track);
           return <PlayerAction key={`${track.id ?? track.language}:${index}`} label={`${selectedSubtitle === label ? '✓ ' : ''}${label}`} onPress={() => { applySubtitleTrack(player, track); setSelectedSubtitle(label); }} />;
         })}</View>
-        <Text style={styles.optionTitle}>Qualité</Text>
-        <View style={styles.optionRow}><PlayerAction label={`${selectedQuality === 'auto' ? '✓ ' : ''}Automatique`} onPress={() => void chooseQuality(null)} />{videoTracks.filter((track) => track.url).map((track) => <PlayerAction key={track.id} label={`${selectedQuality === track.id ? '✓ ' : ''}${videoTrackLabel(track)}`} onPress={() => void chooseQuality(track)} />)}</View>
-        <Text style={styles.optionTitle}>Format d’image</Text>
-        <View style={styles.optionRow}><PlayerAction label={contentFit === 'contain' ? 'Ajuster' : contentFit === 'cover' ? 'Remplir' : 'Étirer'} onPress={cycleContentFit} /></View>
-        <Text style={styles.diagnostic}>Vidéo : {player.videoTrack ? videoTrackLabel(player.videoTrack) : 'détection automatique'} · Les adresses et identifiants restent masqués.</Text>
+        <Text style={styles.optionTitle}>{tx('Qualité', 'Quality')}</Text>
+        <View style={styles.optionRow}><PlayerAction label={`${selectedQuality === 'auto' ? '✓ ' : ''}${tx('Automatique', 'Automatic')}`} onPress={() => void chooseQuality(null)} />{videoTracks.filter((track) => track.url).map((track) => <PlayerAction key={track.id} label={`${selectedQuality === track.id ? '✓ ' : ''}${videoTrackLabel(track)}`} onPress={() => void chooseQuality(track)} />)}</View>
+        <Text style={styles.optionTitle}>{tx('Format d’image', 'Picture format')}</Text>
+        <View style={styles.optionRow}><PlayerAction label={contentFit === 'contain' ? tx('Ajuster', 'Fit') : contentFit === 'cover' ? tx('Remplir', 'Fill') : tx('Étirer', 'Stretch')} onPress={cycleContentFit} /></View>
+        <Text style={styles.diagnostic}>{tx('Vidéo', 'Video')} : {player.videoTrack ? videoTrackLabel(player.videoTrack) : tx('détection automatique', 'automatic detection')} · {tx('Les adresses et identifiants restent masqués.', 'Addresses and credentials remain hidden.')}</Text>
       </View>}
     </View>
   );
 }
 
 function VlcLiveSurface({ channel, fullscreen, onEngineFailure, onEngineReady }: { channel: Channel; fullscreen: boolean; onEngineFailure: () => void; onEngineReady: () => void }) {
+  const { tx } = useI18n();
   const activity = usePlaybackActivity();
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -185,11 +189,11 @@ function VlcLiveSurface({ channel, fullscreen, onEngineFailure, onEngineReady }:
   useEffect(() => {
     if (ready || error) return;
     const timer = setTimeout(() => {
-      setError('Délai de connexion dépassé pour ce flux.');
+      setError(tx('Délai de connexion dépassé pour ce flux.', 'Connection timed out for this stream.'));
       onEngineFailure();
     }, 10_000);
     return () => clearTimeout(timer);
-  }, [error, onEngineFailure, ready]);
+  }, [error, onEngineFailure, ready, tx]);
   return <View style={[styles.playerBlock, fullscreen && styles.playerBlockFullscreen]}>
     <View style={[styles.videoFrame, fullscreen && styles.videoFrameFullscreen]}>
       <LibVlcPlayerView
@@ -206,13 +210,14 @@ function VlcLiveSurface({ channel, fullscreen, onEngineFailure, onEngineReady }:
         source={channel.streamUrl}
         style={styles.video}
       />
-      {activity.buffering && !error && <View pointerEvents="none" style={styles.loadingOverlay}><ActivityIndicator color={colors.accentStrong} size="large" /><Text style={styles.loadingText}>Connexion au flux…</Text></View>}
+      {activity.buffering && !error && <View pointerEvents="none" style={styles.loadingOverlay}><ActivityIndicator color={colors.accentStrong} size="large" /><Text style={styles.loadingText}>{tx('Connexion au flux…', 'Connecting to stream…')}</Text></View>}
     </View>
     {problem && <View accessibilityRole="alert" style={styles.problem}><Text style={styles.problemTitle}>{problem.title}</Text><Text style={styles.problemDetail}>{problem.detail}</Text></View>}
   </View>;
 }
 
 export function PlayerScreen() {
+  const { tx } = useI18n();
   const { channelId } = useLocalSearchParams<{ channelId: string }>();
   const { width } = useWindowDimensions();
   const compact = !Platform.isTV && width < 700;
@@ -229,10 +234,33 @@ export function PlayerScreen() {
   const [retryAttempt, setRetryAttempt] = useState(0);
   const [programmes, setProgrammes] = useState<Awaited<ReturnType<EpgRepository['nowNext']>>>([]);
   const [fullscreen, setFullscreen] = useState(false);
+  const [fullscreenControlsVisible, setFullscreenControlsVisible] = useState(true);
+  const fullscreenControlsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const revealFullscreenControls = useCallback(() => {
+    setFullscreenControlsVisible(true);
+    if (fullscreenControlsTimer.current) clearTimeout(fullscreenControlsTimer.current);
+    if (fullscreen) {
+      fullscreenControlsTimer.current = setTimeout(() => setFullscreenControlsVisible(false), 3_500);
+    }
+  }, [fullscreen]);
+
+  const handleFullscreenChange = useCallback((next: boolean) => {
+    setFullscreen(next);
+    setFullscreenControlsVisible(true);
+    if (fullscreenControlsTimer.current) clearTimeout(fullscreenControlsTimer.current);
+    if (next) fullscreenControlsTimer.current = setTimeout(() => setFullscreenControlsVisible(false), 3_500);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (fullscreenControlsTimer.current) clearTimeout(fullscreenControlsTimer.current);
+    };
+  }, []);
 
   const toggleFullscreen = useCallback(async () => {
     const next = !fullscreen;
-    setFullscreen(next);
+    handleFullscreenChange(next);
     if (Platform.isTV) return;
     try {
       if (next) await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
@@ -240,7 +268,7 @@ export function PlayerScreen() {
     } catch {
       // The video still fills the available screen when rotation locking is unavailable.
     }
-  }, [fullscreen]);
+  }, [fullscreen, handleFullscreenChange]);
 
   useEffect(() => () => {
     if (!Platform.isTV) void ScreenOrientation.unlockAsync().catch(() => undefined);
@@ -264,15 +292,15 @@ export function PlayerScreen() {
     if (!channelId) return;
     repository.findById(channelId)
       .then((found) => {
-        if (!found) throw new Error('Chaîne introuvable.');
+        if (!found) throw new Error(tx('Chaîne introuvable.', 'Channel not found.'));
         return resolveXtreamChannelCandidates(found).then((resolved) => {
           configureVariants(resolved);
           preferences.setLastPlayingChannel(found.id);
           return repository.markWatched(found.id);
         });
       })
-      .catch((caught) => setError(caught instanceof Error ? caught.message : 'Lecture impossible.'));
-  }, [channelId, configureVariants]);
+      .catch((caught) => setError(caught instanceof Error ? caught.message : tx('Lecture impossible.', 'Playback failed.')));
+  }, [channelId, configureVariants, tx]);
 
   useEffect(() => {
     if (!channel) return;
@@ -303,7 +331,7 @@ export function PlayerScreen() {
     try {
       const preloaded = adjacent[direction];
       const found = preloaded ?? await repository.findAdjacent(channel.id, direction);
-      if (!found) throw new Error('Aucune autre chaîne disponible.');
+      if (!found) throw new Error(tx('Aucune autre chaîne disponible.', 'No other channel available.'));
       const variants = preloaded ? [preloaded] : await resolveXtreamChannelCandidates(found);
       setAdjacent({ previous: null, next: null });
       configureVariants(variants);
@@ -312,12 +340,12 @@ export function PlayerScreen() {
       preferences.setLastPlayingChannel(found.id);
       await repository.markWatched(found.id);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Changement de chaîne impossible.');
+      setError(caught instanceof Error ? caught.message : tx('Changement de chaîne impossible.', 'Unable to change channel.'));
     } finally {
       switchingRef.current = false;
       setSwitching(false);
     }
-  }, [adjacent, channel, configureVariants]);
+  }, [adjacent, channel, configureVariants, tx]);
 
   const retryAutomatically = useCallback(() => {
     const nextVariant = variantIndex + 1;
@@ -359,14 +387,18 @@ export function PlayerScreen() {
 
   useTVEventHandler((event) => {
     if (!Platform.isTV || event.eventKeyAction === 1) return;
+    if (fullscreen) revealFullscreenControls();
     if (event.eventType === 'up') void changeChannel('previous');
     if (event.eventType === 'down') void changeChannel('next');
-    if (event.eventType === 'select') void toggleFullscreen();
+    if (event.eventType === 'select') {
+      if (fullscreen && !fullscreenControlsVisible) revealFullscreenControls();
+      else void toggleFullscreen();
+    }
   });
 
   return (
     <Screen fullscreen={fullscreen}>
-      <Stack.Screen options={{ headerShown: !fullscreen, title: channel?.displayName ?? 'Direct' }} />
+      <Stack.Screen options={{ headerShown: !fullscreen, title: channel?.displayName ?? tx('Direct', 'Live') }} />
       <View style={[styles.container, compact && !fullscreen && styles.containerCompact, fullscreen && styles.containerFullscreen]}>
         {channel ? liveEngine === 'native' ? (
           <PlayerSurface
@@ -376,7 +408,7 @@ export function PlayerScreen() {
             onAutomaticRetry={retryAutomatically}
             onEngineFailure={handleEngineFailure}
             onEngineReady={markRecovered}
-            onFullscreenChange={setFullscreen}
+            onFullscreenChange={handleFullscreenChange}
             onRecovered={markRecovered}
             onRetry={retryManually}
             retryAttempt={retryAttempt}
@@ -387,17 +419,18 @@ export function PlayerScreen() {
           <View style={[styles.details, compact && styles.detailsCompact]}>
             <View style={styles.channelDetails}>
               <Text numberOfLines={1} style={styles.title}>{channel.displayName}</Text>
-              {programmes[0] && <Text numberOfLines={1} style={styles.now}>Maintenant · {programmes[0].title}</Text>}
-              {programmes[1] && <Text numberOfLines={1} style={styles.next}>Ensuite · {programmes[1].title}</Text>}
-              {Platform.isTV && <Text style={styles.hint}>D-pad haut/bas : changer de chaîne</Text>}
+              {programmes[0] && <Text numberOfLines={1} style={styles.now}>{tx('Maintenant', 'Now')} · {programmes[0].title}</Text>}
+              {programmes[1] && <Text numberOfLines={1} style={styles.next}>{tx('Ensuite', 'Next')} · {programmes[1].title}</Text>}
+              {Platform.isTV && <Text style={styles.hint}>{tx('D-pad haut/bas : changer de chaîne', 'D-pad up/down: change channel')}</Text>}
             </View>
             <View style={styles.actions}>
-              <PlayerAction autoFocus label="Plein écran" onPress={() => void toggleFullscreen()} />
+              <PlayerAction autoFocus label={tx('Plein écran', 'Full screen')} onPress={() => void toggleFullscreen()} />
             </View>
           </View>
         )}
-        {channel && fullscreen && <View style={styles.fullscreenAction}><PlayerAction autoFocus label="Quitter le plein écran" onPress={() => void toggleFullscreen()} /></View>}
-        {!fullscreen && switching && <Text style={styles.switching}>Changement de chaîne…</Text>}
+        {channel && fullscreen && <Pressable accessibilityLabel={tx('Afficher les commandes', 'Show controls')} accessibilityRole="button" onPress={revealFullscreenControls} style={styles.fullscreenTouchLayer} />}
+        {channel && fullscreen && fullscreenControlsVisible && <View style={styles.fullscreenAction}><PlayerAction autoFocus label={tx('Quitter le plein écran', 'Exit full screen')} onPress={() => void toggleFullscreen()} /></View>}
+        {!fullscreen && switching && <Text style={styles.switching}>{tx('Changement de chaîne…', 'Changing channel…')}</Text>}
         {!fullscreen && error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
       </View>
     </Screen>
@@ -424,6 +457,7 @@ const styles = StyleSheet.create({
   hint: { color: colors.textMuted, fontSize: 13, marginTop: spacing.xs },
   actions: { flexDirection: 'row', gap: spacing.sm },
   fullscreenAction: { bottom: spacing.md, position: 'absolute', right: spacing.md, zIndex: 4 },
+  fullscreenTouchLayer: { bottom: 0, left: 0, position: 'absolute', right: 0, top: 0, zIndex: 3 },
   action: { minHeight: 48, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   actionLabel: { color: colors.text, fontSize: 14, fontWeight: '700' },
   switching: { color: colors.accentStrong, fontSize: 14, marginTop: spacing.sm },

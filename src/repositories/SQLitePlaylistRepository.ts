@@ -1,4 +1,5 @@
 import { getDatabase } from '../storage/database';
+import { translate } from '../i18n';
 import type { Playlist } from '../types/domain';
 import type { CreatePlaylistInput, PlaylistRepository } from './PlaylistRepository';
 
@@ -71,7 +72,7 @@ export class SQLitePlaylistRepository implements PlaylistRepository {
 
     const playlist = await this.findById(input.id);
     if (!playlist) {
-      throw new Error('La playlist créée est introuvable.');
+      throw new Error(translate('La playlist créée est introuvable.', 'The created playlist could not be found.'));
     }
 
     return playlist;

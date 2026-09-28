@@ -1,4 +1,5 @@
 import { getDatabase } from '../storage/database';
+import { translate } from '../i18n';
 import type { SourceKind } from '../types/domain';
 import { stableId } from '../utils/ids';
 import type { ParsedM3uChannel } from '../services/m3uParser';
@@ -35,7 +36,7 @@ type ExistingChannelRow = {
 
 export class DuplicatePlaylistError extends Error {
   constructor(public readonly existingPlaylistId: string, existingName: string) {
-    super(`Cette source existe déjà dans « ${existingName} ».`);
+    super(translate(`Cette source existe déjà dans « ${existingName} ».`, `This source already exists in "${existingName}".`));
     this.name = 'DuplicatePlaylistError';
   }
 }

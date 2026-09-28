@@ -5,20 +5,22 @@ import { FocusableCard } from '../components/FocusableCard';
 import { PageHeader } from '../components/NexusUI';
 import { Screen } from '../components/Screen';
 import { colors, spacing } from '../theme/tokens';
+import { useI18n } from '../i18n';
 
 const destinations = [
-  ['Rechercher', 'search-outline', '/(tabs)/search'],
-  ['Guide TV', 'calendar-outline', '/(tabs)/guide'],
-  ['Ma liste', 'bookmark-outline', '/(tabs)/my-list'],
-  ['Sources', 'library-outline', '/(tabs)/library'],
-  ['Réglages', 'settings-outline', '/(tabs)/settings'],
+  ['Rechercher', 'Search', 'search-outline', '/(tabs)/search'],
+  ['Guide TV', 'TV guide', 'calendar-outline', '/(tabs)/guide'],
+  ['Favoris', 'Favorites', 'heart-outline', '/(tabs)/my-list'],
+  ['Sources', 'Sources', 'library-outline', '/(tabs)/library'],
+  ['Réglages', 'Settings', 'settings-outline', '/(tabs)/settings'],
 ] as const;
 
 export function MoreScreen() {
   const router = useRouter();
+  const { tx } = useI18n();
   return <Screen navigation><ScrollView contentContainerStyle={styles.container}>
-    <PageHeader eyebrow="NEXUSPLAYER" subtitle="Recherche, favoris, sources et préférences." title="Plus" />
-    <View style={styles.list}>{destinations.map(([label, icon, href]) => <FocusableCard accessibilityRole="button" key={href} onPress={() => router.push(href)} style={styles.row}><Ionicons color={colors.accentStrong} name={icon} size={24} /><Text style={styles.label}>{label}</Text><Ionicons color={colors.textMuted} name="chevron-forward" size={22} /></FocusableCard>)}</View>
+    <PageHeader eyebrow="NEXUSPLAYER" subtitle={tx('Recherche, favoris, sources et préférences.', 'Search, favorites, sources and preferences.')} title={tx('Plus', 'More')} />
+    <View style={styles.list}>{destinations.map(([french, english, icon, href]) => { const label = tx(french, english); return <FocusableCard accessibilityLabel={label} accessibilityRole="button" key={href} onPress={() => router.push(href)} style={styles.row}><Ionicons color={colors.accentStrong} name={icon} size={24} /><Text style={styles.label}>{label}</Text><Ionicons color={colors.textMuted} name="chevron-forward" size={22} /></FocusableCard>; })}</View>
   </ScrollView></Screen>;
 }
 

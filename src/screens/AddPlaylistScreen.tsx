@@ -22,17 +22,31 @@ import { describeSourceError } from '../services/sourceError';
 import { colors, radii, spacing } from '../theme/tokens';
 import { m3uUrlInputSchema, xtreamInputSchema } from '../types/validation';
 import { importXtream } from '../services/xtreamImportService';
+import { useI18n } from '../i18n';
 
 type Mode = 'chooser' | 'm3u-url' | 'xtream';
 
 const sourceOptions = [
-  { id: 'xtream', icon: 'server-outline' as const, title: 'Xtream Codes', description: 'Adresse du serveur, identifiant et mot de passe.', disabled: false },
-  { id: 'm3u-url', icon: 'link-outline' as const, title: 'Lien M3U', description: 'Importez une playlist distante via HTTPS ou HTTP autorisé.', disabled: false },
-  { id: 'm3u-file', icon: 'document-outline' as const, title: 'Fichier local', description: 'Sélectionnez un fichier .m3u ou .m3u8 présent sur l’appareil.', disabled: false },
-  { id: 'stalker', icon: 'time-outline' as const, title: 'Portail Stalker', description: 'Prévu pour une version ultérieure après stabilisation du MVP.', disabled: true },
+  { id: 'xtream', icon: 'server-outline' as const, title: ['Xtream Codes', 'Xtream Codes'], description: ['Adresse du serveur, identifiant et mot de passe.', 'Server address, username and password.'], disabled: false },
+  { id: 'm3u-url', icon: 'link-outline' as const, title: ['Lien M3U', 'M3U link'], description: ['Importez une playlist distante via HTTPS ou HTTP autorisé.', 'Import a remote playlist over HTTPS or authorized HTTP.'], disabled: false },
+  { id: 'm3u-file', icon: 'document-outline' as const, title: ['Fichier local', 'Local file'], description: ['Sélectionnez un fichier .m3u ou .m3u8 présent sur l’appareil.', 'Select an .m3u or .m3u8 file on the device.'], disabled: false },
+  { id: 'stalker', icon: 'time-outline' as const, title: ['Portail Stalker', 'Stalker portal'], description: ['Prévu pour une version ultérieure après stabilisation du MVP.', 'Planned for a later release after the MVP is stable.'], disabled: true },
 ] as const;
 
 export function AddPlaylistScreen() {
+  const { tx } = useI18n();
+  const validationMessage = (message?: string) => {
+    if (!message) return tx('Vérifiez les informations saisies.', 'Check the information entered.');
+    const messages: Record<string, string> = {
+      'Adresse invalide': 'Invalid address',
+      'Utilisez une adresse HTTP ou HTTPS': 'Use an HTTP or HTTPS address',
+      'Le nom est obligatoire': 'Name is required',
+      'Le nom est trop long': 'Name is too long',
+      'L’identifiant est obligatoire': 'Username is required',
+      'Le mot de passe est obligatoire': 'Password is required',
+    };
+    return tx(message, messages[message] ?? message);
+  };
   const router = useRouter();
   const { width } = useWindowDimensions();
   const compact = !Platform.isTV && width < 600;
@@ -63,7 +77,7 @@ export function AddPlaylistScreen() {
 
     try {
       const report = await action();
-      setStatus(`${report.channels.length} chaînes importées, ${report.duplicateCount} doublons et ${report.ignoredCount} lignes ignorées.`);
+      setStatus(tx(`${report.channels.length} chaînes importées, ${report.duplicateCount} doublons et ${report.ignoredCount} lignes ignorées.`, `${report.channels.length} channels imported, ${report.duplicateCount} duplicates and ${report.ignoredCount} lines ignored.`));
       setTimeout(() => router.replace('/(tabs)/library'), 700);
     } catch (caughtError) {
       setStatus(null);
@@ -77,7 +91,7 @@ export function AddPlaylistScreen() {
   async function submitUrl() {
     const parsed = m3uUrlInputSchema.safeParse({ name, url });
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? 'Vérifiez les informations saisies.');
+      setError(validationMessage(parsed.error.issues[0]?.message));
       return;
     }
 
@@ -85,7 +99,7 @@ export function AddPlaylistScreen() {
     downloadController.current = controller;
     setCanCancel(true);
     try {
-      await runImport('Téléchargement, analyse et enregistrement…', () =>
+      await runImport(tx('Téléchargement, analyse et enregistrement…', 'Downloading, analyzing and saving…'), () =>
         importM3uFromUrl(parsed.data.name, parsed.data.url, controller.signal),
       );
     } finally {
@@ -102,25 +116,25 @@ export function AddPlaylistScreen() {
     const asset = result.assets[0];
     if (!asset) return;
     if (!/\.m3u8?$/i.test(asset.name)) {
-      setError('Sélectionnez un fichier portant l’extension .m3u ou .m3u8.');
+      setError(tx('Sélectionnez un fichier portant l’extension .m3u ou .m3u8.', 'Select a file with the .m3u or .m3u8 extension.'));
       return;
     }
 
-    const playlistName = asset.name.replace(/\.m3u8?$/i, '').trim() || 'Playlist locale';
-    await runImport('Lecture, analyse et enregistrement…', () =>
+    const playlistName = asset.name.replace(/\.m3u8?$/i, '').trim() || tx('Playlist locale', 'Local playlist');
+    await runImport(tx('Lecture, analyse et enregistrement…', 'Reading, analyzing and saving…'), () =>
       importM3uFromFile(playlistName, asset.uri, asset.size),
     );
   }
 
   async function submitXtream() {
     const parsed = xtreamInputSchema.safeParse({ name, serverUrl, username, password });
-    if (!parsed.success) { setError(parsed.error.issues[0]?.message ?? 'Vérifiez les informations saisies.'); return; }
+    if (!parsed.success) { setError(validationMessage(parsed.error.issues[0]?.message)); return; }
     if (submissionRef.current) return;
     submissionRef.current = true;
-    setBusy(true); setError(null); setStatus('Connexion et import du catalogue Xtream…');
+    setBusy(true); setError(null); setStatus(tx('Connexion et import du catalogue Xtream…', 'Connecting and importing the Xtream catalog…'));
     try {
       const report = await importXtream(parsed.data.name, parsed.data.serverUrl, { username: parsed.data.username, password: parsed.data.password });
-      setStatus(`${report.channels} chaînes, ${report.movies} films et ${report.series} séries importés.`);
+      setStatus(tx(`${report.channels} chaînes, ${report.movies} films et ${report.series} séries importés.`, `${report.channels} channels, ${report.movies} movies and ${report.series} series imported.`));
       setTimeout(() => router.replace('/(tabs)/library'), 700);
     } catch (caught) { setStatus(null); setError(describeSourceError(caught)); }
     finally { setBusy(false); submissionRef.current = false; }
@@ -141,9 +155,9 @@ export function AddPlaylistScreen() {
   return (
     <Screen>
       <ScrollView contentContainerStyle={[styles.container, compact && styles.containerCompact]} keyboardShouldPersistTaps="handled">
-        <Text style={styles.eyebrow}>NOUVELLE SOURCE</Text>
-        <Text style={[styles.title, compact && styles.titleCompact]}>{mode === 'chooser' ? 'Comment souhaitez-vous importer vos contenus ?' : mode === 'xtream' ? 'Connecter Xtream Codes' : 'Importer un lien M3U'}</Text>
-        <Text style={styles.subtitle}>Utilisez uniquement des playlists et abonnements que vous êtes autorisé à consulter.</Text>
+        <Text style={styles.eyebrow}>{tx('NOUVELLE SOURCE', 'NEW SOURCE')}</Text>
+        <Text style={[styles.title, compact && styles.titleCompact]}>{mode === 'chooser' ? tx('Comment souhaitez-vous importer vos contenus ?', 'How would you like to import your content?') : mode === 'xtream' ? tx('Connecter Xtream Codes', 'Connect Xtream Codes') : tx('Importer un lien M3U', 'Import an M3U link')}</Text>
+        <Text style={styles.subtitle}>{tx('Utilisez uniquement des playlists et abonnements que vous êtes autorisé à consulter.', 'Only use playlists and subscriptions you are authorized to access.')}</Text>
 
         {mode === 'chooser' ? (
           <View style={styles.grid}>
@@ -157,36 +171,36 @@ export function AddPlaylistScreen() {
                 style={[styles.card, { width: cardWidth }, option.disabled && styles.disabled]}
               >
                 <Ionicons color={option.disabled ? colors.textMuted : colors.accentStrong} name={option.icon} size={32} />
-                <Text style={styles.cardTitle}>{option.title}</Text>
-                <Text style={styles.cardDescription}>{option.description}</Text>
-                {option.disabled && <Text style={styles.soon}>BIENTÔT</Text>}
+                <Text style={styles.cardTitle}>{tx(option.title[0], option.title[1])}</Text>
+                <Text style={styles.cardDescription}>{tx(option.description[0], option.description[1])}</Text>
+                {option.disabled && <Text style={styles.soon}>{tx('BIENTÔT', 'COMING SOON')}</Text>}
               </FocusableCard>
             ))}
           </View>
         ) : mode === 'm3u-url' ? (
           <View style={styles.form}>
-            <Text style={styles.label}>Nom de la playlist</Text>
-            <TextInput autoFocus editable={!busy} maxLength={80} onChangeText={setName} onSubmitEditing={() => urlInputRef.current?.focus()} placeholder="Ma playlist" placeholderTextColor={colors.textMuted} returnKeyType="next" style={styles.input} value={name} />
-            <Text style={styles.label}>Adresse M3U</Text>
+            <Text style={styles.label}>{tx('Nom de la playlist', 'Playlist name')}</Text>
+            <TextInput autoFocus editable={!busy} maxLength={80} onChangeText={setName} onSubmitEditing={() => urlInputRef.current?.focus()} placeholder={tx('Ma playlist', 'My playlist')} placeholderTextColor={colors.textMuted} returnKeyType="next" style={styles.input} value={name} />
+            <Text style={styles.label}>{tx('Adresse M3U', 'M3U address')}</Text>
             <TextInput autoCapitalize="none" autoCorrect={false} editable={!busy} keyboardType="url" onChangeText={setUrl} onEndEditing={() => { if (url.trim()) void submitUrl(); }} onSubmitEditing={() => void submitUrl()} placeholder="https://exemple.com/playlist.m3u" placeholderTextColor={colors.textMuted} ref={urlInputRef} returnKeyType="go" style={styles.input} value={url} />
             <View style={[styles.actions, compact && styles.actionsCompact]}>
-              <PrimaryButton disabled={busy} label="Importer" onPress={() => void submitUrl()} style={compact && styles.buttonCompact} />
-              <PrimaryButton disabled={busy} label="Retour" onPress={() => setMode('chooser')} style={compact && styles.buttonCompact} />
+              <PrimaryButton disabled={busy} label={tx('Importer', 'Import')} onPress={() => void submitUrl()} style={compact && styles.buttonCompact} />
+              <PrimaryButton disabled={busy} label={tx('Retour', 'Back')} onPress={() => setMode('chooser')} style={compact && styles.buttonCompact} />
             </View>
           </View>
         ) : (
           <View style={styles.form}>
-            <Text style={styles.label}>Nom de la source</Text>
-            <TextInput autoFocus editable={!busy} maxLength={80} onChangeText={setName} placeholder="Mon abonnement" placeholderTextColor={colors.textMuted} style={styles.input} value={name} />
-            <Text style={styles.label}>Adresse du serveur</Text>
+            <Text style={styles.label}>{tx('Nom de la source', 'Source name')}</Text>
+            <TextInput autoFocus editable={!busy} maxLength={80} onChangeText={setName} placeholder={tx('Mon abonnement', 'My subscription')} placeholderTextColor={colors.textMuted} style={styles.input} value={name} />
+            <Text style={styles.label}>{tx('Adresse du serveur', 'Server address')}</Text>
             <TextInput autoCapitalize="none" autoCorrect={false} editable={!busy} keyboardType="url" onChangeText={setServerUrl} placeholder="https://serveur.example:8080" placeholderTextColor={colors.textMuted} style={styles.input} value={serverUrl} />
-            <Text style={styles.label}>Identifiant</Text>
-            <TextInput autoCapitalize="none" autoCorrect={false} editable={!busy} onChangeText={setUsername} placeholder="Identifiant" placeholderTextColor={colors.textMuted} style={styles.input} value={username} />
-            <Text style={styles.label}>Mot de passe</Text>
-            <TextInput autoCapitalize="none" autoCorrect={false} editable={!busy} onChangeText={setPassword} onEndEditing={() => { if (password) void submitXtream(); }} onSubmitEditing={() => void submitXtream()} placeholder="Mot de passe" placeholderTextColor={colors.textMuted} secureTextEntry style={styles.input} value={password} />
+            <Text style={styles.label}>{tx('Identifiant', 'Username')}</Text>
+            <TextInput autoCapitalize="none" autoCorrect={false} editable={!busy} onChangeText={setUsername} placeholder={tx('Identifiant', 'Username')} placeholderTextColor={colors.textMuted} style={styles.input} value={username} />
+            <Text style={styles.label}>{tx('Mot de passe', 'Password')}</Text>
+            <TextInput autoCapitalize="none" autoCorrect={false} editable={!busy} onChangeText={setPassword} onEndEditing={() => { if (password) void submitXtream(); }} onSubmitEditing={() => void submitXtream()} placeholder={tx('Mot de passe', 'Password')} placeholderTextColor={colors.textMuted} secureTextEntry style={styles.input} value={password} />
             <View style={[styles.actions, compact && styles.actionsCompact]}>
-              <PrimaryButton disabled={busy} label="Connecter" onPress={() => void submitXtream()} style={compact && styles.buttonCompact} />
-              <PrimaryButton disabled={busy} label="Retour" onPress={() => setMode('chooser')} style={compact && styles.buttonCompact} />
+              <PrimaryButton disabled={busy} label={tx('Connecter', 'Connect')} onPress={() => void submitXtream()} style={compact && styles.buttonCompact} />
+              <PrimaryButton disabled={busy} label={tx('Retour', 'Back')} onPress={() => setMode('chooser')} style={compact && styles.buttonCompact} />
             </View>
           </View>
         )}
@@ -196,7 +210,7 @@ export function AddPlaylistScreen() {
             {busy && <ActivityIndicator color={colors.accentStrong} />}
             <Text style={styles.status}>{status}</Text>
             {busy && canCancel && (
-              <PrimaryButton label="Annuler" onPress={() => downloadController.current?.abort()} />
+              <PrimaryButton label={tx('Annuler', 'Cancel')} onPress={() => downloadController.current?.abort()} />
             )}
           </View>
         )}

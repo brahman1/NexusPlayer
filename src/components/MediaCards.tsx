@@ -4,12 +4,14 @@ import { Image, Platform, StyleSheet, Text, useWindowDimensions, View } from 're
 import { colors, radii, spacing } from '../theme/tokens';
 import { FocusableCard } from './FocusableCard';
 import type { Channel } from '../types/domain';
+import { useI18n } from '../i18n';
 
 export function ChannelTile({ channel, autoFocus = false, onPress }: { channel: Channel; autoFocus?: boolean; onPress: () => void }) {
+  const { tx } = useI18n();
   const { width } = useWindowDimensions();
   const [failed, setFailed] = useState(false);
   const tileWidth = Platform.isTV ? 240 : width < 420 ? 184 : 220;
-  return <FocusableCard autoFocus={autoFocus} onPress={onPress} style={[styles.channel, { width: tileWidth }]}><View style={styles.logo}>{channel.logoUrl && !failed ? <Image onError={() => setFailed(true)} resizeMode="contain" source={{ uri: channel.logoUrl }} style={styles.logoImage} /> : <Text style={styles.letter}>{channel.displayName.slice(0, 1).toUpperCase()}</Text>}</View><Text numberOfLines={2} style={styles.channelName}>{channel.displayName}</Text><View style={styles.liveRow}><View style={styles.liveDot} /><Text style={styles.meta}>EN DIRECT</Text></View></FocusableCard>;
+  return <FocusableCard autoFocus={autoFocus} onPress={onPress} style={[styles.channel, { width: tileWidth }]}><View style={styles.logo}>{channel.logoUrl && !failed ? <Image onError={() => setFailed(true)} resizeMode="contain" source={{ uri: channel.logoUrl }} style={styles.logoImage} /> : <Text style={styles.letter}>{channel.displayName.slice(0, 1).toUpperCase()}</Text>}</View><Text numberOfLines={2} style={styles.channelName}>{channel.displayName}</Text><View style={styles.liveRow}><View style={styles.liveDot} /><Text style={styles.meta}>{tx('EN DIRECT', 'LIVE')}</Text></View></FocusableCard>;
 }
 
 export function MediaPoster({ title, imageUrl, meta, onPress, progress, width = 176 }: { title: string; imageUrl: string | null; meta?: string | null; onPress?: () => void; progress?: number; width?: number }) {

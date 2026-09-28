@@ -8,6 +8,7 @@ import { DiscoveryRepository } from '../repositories/DiscoveryRepository';
 import { WatchProgressRepository } from '../repositories/WatchProgressRepository';
 import { prefetchXtreamMedia, syncXtreamSeriesEpisodes } from '../services/xtreamImportService';
 import { colors, spacing } from '../theme/tokens';
+import { useI18n } from '../i18n';
 import type { Movie, Series } from '../types/domain';
 
 const discovery = new DiscoveryRepository();
@@ -15,6 +16,7 @@ const progressRepository = new WatchProgressRepository();
 type EpisodeRow = Awaited<ReturnType<DiscoveryRepository['episodes']>>[number];
 
 export function MediaDetailScreen() {
+  const { tx } = useI18n();
   const { kind, id } = useLocalSearchParams<{ kind: 'movie' | 'series'; id: string }>();
   const router = useRouter();
   const { width } = useWindowDimensions();
@@ -53,7 +55,7 @@ export function MediaDetailScreen() {
   }, [id, kind]);
 
   if (loading) return <Screen><ActivityIndicator color={colors.accentStrong} size="large" /></Screen>;
-  if (!item) return <Screen><EmptyState detail="Ce contenu n’est plus disponible dans la source." title="Contenu introuvable" /></Screen>;
+  if (!item) return <Screen><EmptyState detail={tx('Ce contenu n’est plus disponible dans la source.', 'This content is no longer available from the source.')} title={tx('Contenu introuvable', 'Content not found')} /></Screen>;
 
   const favorite = item.isFavorite;
   const setFavorite = async () => {
@@ -66,12 +68,12 @@ export function MediaDetailScreen() {
     if (kind === 'movie') router.push({ pathname: '/watch/movie/[id]', params: { id: item.id } });
     else if (targetEpisode) router.push({ pathname: '/watch/episode/[id]', params: { id: targetEpisode } });
   };
-  const playLabel = kind === 'movie' ? (hasMovieProgress ? 'Reprendre le film' : 'Lire') : (resumeEpisodeId ? 'Reprendre la série' : 'Lire le premier épisode');
+  const playLabel = kind === 'movie' ? (hasMovieProgress ? tx('Reprendre le film', 'Resume movie') : tx('Lire', 'Play')) : (resumeEpisodeId ? tx('Reprendre la série', 'Resume series') : tx('Lire le premier épisode', 'Play first episode'));
 
   return <Screen><View style={[styles.container, compact && styles.containerCompact]}>
-    <PageHeader eyebrow={kind === 'movie' ? 'FILM' : 'SÉRIE'} subtitle={item.plot ?? 'Aucune description disponible.'} title={item.name} />
-    <Panel><View style={[styles.actions, compact && styles.actionsCompact]}><ActionButton autoFocus disabled={kind === 'series' && !targetEpisode} icon="play" label={playLabel} onPress={play} style={compact && styles.actionCompact} /><ActionButton icon={favorite ? 'bookmark' : 'bookmark-outline'} label={favorite ? 'Retirer de Ma liste' : 'Ajouter à Ma liste'} onPress={() => void setFavorite()} style={compact && styles.actionCompact} /></View></Panel>
-    {kind === 'series' && (episodes.length ? <FlatList data={episodes} keyExtractor={(episode) => episode.id} renderItem={({ item: episode }) => <FocusableCard onPress={() => router.push({ pathname: '/watch/episode/[id]', params: { id: episode.id } })} style={styles.episode}><Text style={styles.episodeNumber}>S{episode.season_number} · E{episode.episode_number}</Text><Text style={styles.episodeTitle}>{episode.name}</Text>{episode.id === resumeEpisodeId && <Text style={styles.resume}>À reprendre</Text>}</FocusableCard>} /> : <EmptyState detail="La source n’a pas encore fourni le détail des saisons et épisodes." title="Épisodes indisponibles" />)}
+    <PageHeader eyebrow={kind === 'movie' ? tx('FILM', 'MOVIE') : tx('SÉRIE', 'SERIES')} subtitle={item.plot ?? tx('Aucune description disponible.', 'No description available.')} title={item.name} />
+    <Panel><View style={[styles.actions, compact && styles.actionsCompact]}><ActionButton autoFocus disabled={kind === 'series' && !targetEpisode} icon="play" label={playLabel} onPress={play} style={compact && styles.actionCompact} /><ActionButton icon={favorite ? 'bookmark' : 'bookmark-outline'} label={favorite ? tx('Retirer de Ma liste', 'Remove from My list') : tx('Ajouter à Ma liste', 'Add to My list')} onPress={() => void setFavorite()} style={compact && styles.actionCompact} /></View></Panel>
+    {kind === 'series' && (episodes.length ? <FlatList data={episodes} keyExtractor={(episode) => episode.id} renderItem={({ item: episode }) => <FocusableCard onPress={() => router.push({ pathname: '/watch/episode/[id]', params: { id: episode.id } })} style={styles.episode}><Text style={styles.episodeNumber}>S{episode.season_number} · E{episode.episode_number}</Text><Text style={styles.episodeTitle}>{episode.name}</Text>{episode.id === resumeEpisodeId && <Text style={styles.resume}>{tx('À reprendre', 'Resume')}</Text>}</FocusableCard>} /> : <EmptyState detail={tx('La source n’a pas encore fourni le détail des saisons et épisodes.', 'The source has not provided season and episode details yet.')} title={tx('Épisodes indisponibles', 'Episodes unavailable')} />)}
   </View></Screen>;
 }
 

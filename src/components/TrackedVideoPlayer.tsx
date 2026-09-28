@@ -10,6 +10,7 @@ import { WatchProgressRepository } from '../repositories/WatchProgressRepository
 import { describePlaybackError } from '../services/playbackError';
 import { colors, radii, spacing } from '../theme/tokens';
 import { reachedSeekTarget } from '../services/playbackActivity';
+import { useI18n } from '../i18n';
 
 const progressRepository = new WatchProgressRepository();
 const VOD_PLAYER_OPTIONS = ['--network-caching=750', '--input-fast-seek', '--http-reconnect'];
@@ -35,6 +36,7 @@ function playableTracks(items: MediaTrack[]) {
 }
 
 export function TrackedVideoPlayer({ mediaId, mediaKind, name, nextEpisode, onEnded, onFatalError, onFullscreenChange, onReady, onProgress, resumeSeconds, uri }: TrackedVideoPlayerProps) {
+  const { tx } = useI18n();
   const { width } = useWindowDimensions();
   const compact = !Platform.isTV && width < 600;
   const playerRef = useRef<LibVlcPlayerViewRef>(null);
@@ -139,7 +141,7 @@ export function TrackedVideoPlayer({ mediaId, mediaKind, name, nextEpisode, onEn
       pendingSeek.current = null;
       setPosition(latestPosition.current);
       setScrubPosition(latestPosition.current);
-      setNotice('La position demandée n’a pas été confirmée. Le serveur ou le fichier peut limiter l’avance rapide.');
+      setNotice(tx('La position demandée n’a pas été confirmée. Le serveur ou le fichier peut limiter l’avance rapide.', 'The requested position was not confirmed. The server or file may limit fast seeking.'));
     }, 8000);
     // Coalesce rapid button presses; do not restart playback for each seek.
     seekDispatch.current = setTimeout(() => {
@@ -150,10 +152,10 @@ export function TrackedVideoPlayer({ mediaId, mediaKind, name, nextEpisode, onEn
         clearBufferingTimer();
         setBuffering(false);
         setPosition(latestPosition.current);
-        setNotice('Impossible d’atteindre cette position dans le flux.');
+        setNotice(tx('Impossible d’atteindre cette position dans le flux.', 'Unable to reach this position in the stream.'));
       });
     }, 150);
-  }, [clearBufferingTimer, clearSeekWatchdog, scheduleBufferingIndicator, seekable]);
+  }, [clearBufferingTimer, clearSeekWatchdog, scheduleBufferingIndicator, seekable, tx]);
 
   const seekBy = useCallback((seconds: number) => seekTo((pendingSeek.current ?? latestPosition.current) + seconds), [seekTo]);
 
@@ -185,19 +187,19 @@ export function TrackedVideoPlayer({ mediaId, mediaKind, name, nextEpisode, onEn
         if (next) await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
         else await ScreenOrientation.unlockAsync();
       } catch {
-        setNotice('La rotation automatique est indisponible sur cet appareil.');
+        setNotice(tx('La rotation automatique est indisponible sur cet appareil.', 'Automatic rotation is unavailable on this device.'));
       }
     }
-  }, [clearControlsTimer, fullscreen, onFullscreenChange]);
+  }, [clearControlsTimer, fullscreen, onFullscreenChange, tx]);
 
   const startPictureInPicture = useCallback(async (silent = false) => {
     try {
       await playerRef.current?.startPictureInPicture();
       if (!silent) setNotice(null);
     } catch {
-      if (!silent) setNotice('Le mode image dans l’image est indisponible pour cette lecture.');
+      if (!silent) setNotice(tx('Le mode image dans l’image est indisponible pour cette lecture.', 'Picture in Picture is unavailable for this playback.'));
     }
-  }, []);
+  }, [tx]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
@@ -222,16 +224,16 @@ export function TrackedVideoPlayer({ mediaId, mediaKind, name, nextEpisode, onEn
   const selectAudioTrack = useCallback((id: number) => {
     setTracks((current) => ({ ...current, audio: id }));
     const selected = audioTracks.find((track) => track.id === id);
-    setNotice(selected ? `Langue audio : ${selected.name}` : null);
+    setNotice(selected ? tx(`Langue audio : ${selected.name}`, `Audio language: ${selected.name}`) : null);
     if (playing) setTimeout(() => { void playerRef.current?.play(); }, 50);
-  }, [audioTracks, playing]);
+  }, [audioTracks, playing, tx]);
 
   const selectSubtitleTrack = useCallback((id: number) => {
     setTracks((current) => ({ ...current, subtitle: id }));
     const selected = subtitleTracks.find((track) => track.id === id);
-    setNotice(id === -1 ? 'Sous-titres désactivés.' : selected ? `Sous-titres : ${selected.name}` : 'Piste de sous-titres sélectionnée.');
+    setNotice(id === -1 ? tx('Sous-titres désactivés.', 'Subtitles disabled.') : selected ? tx(`Sous-titres : ${selected.name}`, `Subtitles: ${selected.name}`) : tx('Piste de sous-titres sélectionnée.', 'Subtitle track selected.'));
     if (playing) setTimeout(() => { void playerRef.current?.play(); }, 50);
-  }, [playing, subtitleTracks]);
+  }, [playing, subtitleTracks, tx]);
 
   const displayedPosition = seeking ? scrubPosition : position;
 
@@ -316,7 +318,7 @@ export function TrackedVideoPlayer({ mediaId, mediaKind, name, nextEpisode, onEn
         style={styles.video}
         tracks={tracks}
       />
-      {fullscreen && <Pressable accessibilityLabel={controlsVisible ? 'Masquer les commandes' : 'Afficher les commandes'} accessibilityRole="button" onPress={() => { if (controlsVisible) { clearControlsTimer(); setControlsVisible(false); } else revealControls(); }} style={styles.fullscreenTouchLayer} />}
+      {fullscreen && <Pressable accessibilityLabel={controlsVisible ? tx('Masquer les commandes', 'Hide controls') : tx('Afficher les commandes', 'Show controls')} accessibilityRole="button" onPress={() => { if (controlsVisible) { clearControlsTimer(); setControlsVisible(false); } else revealControls(); }} style={styles.fullscreenTouchLayer} />}
       {buffering && !playbackError && <ActivityIndicator color={colors.accentStrong} size="large" style={styles.loading} />}
       {playbackError && <View accessibilityRole="alert" style={styles.errorPanel}><Text style={styles.errorTitle}>{playbackError.title}</Text><Text style={styles.errorDetail}>{playbackError.detail}</Text></View>}
     </View>
@@ -324,7 +326,7 @@ export function TrackedVideoPlayer({ mediaId, mediaKind, name, nextEpisode, onEn
     {(!fullscreen || controlsVisible) && <View onTouchStart={revealControls} style={[styles.controlPanel, fullscreen && styles.controlPanelFullscreen]}>
       <View style={styles.timeline}>
         <Slider
-          accessibilityLabel="Position de lecture"
+          accessibilityLabel={tx('Position de lecture', 'Playback position')}
           disabled={!seekable || duration <= 0}
           maximumTrackTintColor={colors.surfaceRaised}
           maximumValue={Math.max(duration, 1)}
@@ -343,33 +345,34 @@ export function TrackedVideoPlayer({ mediaId, mediaKind, name, nextEpisode, onEn
 
       <View style={styles.transportControls}>
         <ControlButton compact={compact} icon="play-back" label="-10 s" onPress={() => void seekBy(-10)} style={styles.transportButton} />
-        <ControlButton compact={compact} icon={playing ? 'pause' : 'play'} label={playing ? 'Pause' : 'Lire'} onPress={togglePlayback} primary style={styles.transportButton} />
+        <ControlButton compact={compact} icon={playing ? 'pause' : 'play'} label={playing ? tx('Pause', 'Pause') : tx('Lire', 'Play')} onPress={togglePlayback} primary style={styles.transportButton} />
         <ControlButton compact={compact} icon="stop" label="Stop" onPress={stopPlayback} style={styles.transportButton} />
         <ControlButton compact={compact} icon="play-forward" label="+30 s" onPress={() => void seekBy(30)} style={styles.transportButton} />
       </View>
       <View style={styles.secondaryControls}>
-        {nextEpisode && <ControlButton accessibilityLabel={`Lire l’épisode suivant, ${nextEpisode.name}`} compact={compact} icon="play-skip-forward" label="Épisode suivant" onPress={nextEpisode.onPress} style={compact && styles.secondaryButtonCompact} />}
+        {nextEpisode && <ControlButton accessibilityLabel={tx(`Lire l’épisode suivant, ${nextEpisode.name}`, `Play next episode, ${nextEpisode.name}`)} compact={compact} icon="play-skip-forward" label={tx('Épisode suivant', 'Next episode')} onPress={nextEpisode.onPress} style={compact && styles.secondaryButtonCompact} />}
         <ControlButton compact={compact} icon="volume-high" label="Audio" onPress={() => setTrackPanel((value) => value === 'audio' ? null : 'audio')} style={compact && styles.secondaryButtonCompact} />
-        <ControlButton compact={compact} icon="text" label="Sous-titres" onPress={() => setTrackPanel((value) => value === 'subtitle' ? null : 'subtitle')} style={compact && styles.secondaryButtonCompact} />
-        {!Platform.isTV && <ControlButton compact={compact} icon="albums-outline" label="Image dans l’image" onPress={() => void startPictureInPicture()} style={compact && styles.secondaryButtonCompact} />}
-        <ControlButton compact={compact} icon={fullscreen ? 'contract' : 'expand'} label={fullscreen ? 'Quitter le plein écran' : 'Plein écran'} onPress={() => void toggleFullscreen()} style={compact && styles.secondaryButtonCompact} />
+        <ControlButton compact={compact} icon="text" label={tx('Sous-titres', 'Subtitles')} onPress={() => setTrackPanel((value) => value === 'subtitle' ? null : 'subtitle')} style={compact && styles.secondaryButtonCompact} />
+        {!Platform.isTV && <ControlButton compact={compact} icon="albums-outline" label={tx('Image dans l’image', 'Picture in Picture')} onPress={() => void startPictureInPicture()} style={compact && styles.secondaryButtonCompact} />}
+        <ControlButton compact={compact} icon={fullscreen ? 'contract' : 'expand'} label={fullscreen ? tx('Quitter le plein écran', 'Exit full screen') : tx('Plein écran', 'Full screen')} onPress={() => void toggleFullscreen()} style={compact && styles.secondaryButtonCompact} />
       </View>
 
-      {trackPanel === 'audio' && <TrackSelector emptyLabel="Aucune autre piste audio détectée" label="Langue audio" onSelect={selectAudioTrack} selectedId={tracks.audio} tracks={audioTracks} />}
-      {trackPanel === 'subtitle' && <TrackSelector allowDisabled emptyLabel="Aucun sous-titre intégré détecté dans cette vidéo" label="Sous-titres" onSelect={selectSubtitleTrack} selectedId={tracks.subtitle} tracks={subtitleTracks} />}
+      {trackPanel === 'audio' && <TrackSelector emptyLabel={tx('Aucune autre piste audio détectée', 'No other audio track detected')} label={tx('Langue audio', 'Audio language')} onSelect={selectAudioTrack} selectedId={tracks.audio} tracks={audioTracks} />}
+      {trackPanel === 'subtitle' && <TrackSelector allowDisabled emptyLabel={tx('Aucun sous-titre intégré détecté dans cette vidéo', 'No embedded subtitles detected in this video')} label={tx('Sous-titres', 'Subtitles')} onSelect={selectSubtitleTrack} selectedId={tracks.subtitle} tracks={subtitleTracks} />}
       {notice && <Text accessibilityRole="alert" style={styles.notice}>{notice}</Text>}
       {!fullscreen && <Text numberOfLines={2} style={styles.title}>{name}</Text>}
-      {!fullscreen && resumeSeconds >= 10 && <Text style={styles.resume}>Reprise à {formatTime(resumeSeconds)}</Text>}
+      {!fullscreen && resumeSeconds >= 10 && <Text style={styles.resume}>{tx('Reprise à', 'Resuming at')} {formatTime(resumeSeconds)}</Text>}
     </View>}
   </View>;
 }
 
 function TrackSelector({ allowDisabled = false, emptyLabel, label, onSelect, selectedId, tracks }: { allowDisabled?: boolean; emptyLabel: string; label: string; onSelect: (id: number) => void; selectedId?: number; tracks: MediaTrack[] }) {
+  const { tx } = useI18n();
   return <View style={styles.trackPanel}>
     <Text style={styles.trackTitle}>{label}</Text>
     {tracks.length === 0 && !allowDisabled ? <Text style={styles.trackEmpty}>{emptyLabel}</Text> : <ScrollView contentContainerStyle={styles.trackList} horizontal showsHorizontalScrollIndicator={false}>
-      {allowDisabled && <TrackButton active={selectedId === -1 || selectedId === undefined} label="Désactivés" onPress={() => onSelect(-1)} />}
-      {tracks.map((track) => <TrackButton active={track.id === selectedId} key={track.id} label={track.name || `Piste ${track.id}`} onPress={() => onSelect(track.id)} />)}
+      {allowDisabled && <TrackButton active={selectedId === -1 || selectedId === undefined} label={tx('Désactivés', 'Off')} onPress={() => onSelect(-1)} />}
+      {tracks.map((track) => <TrackButton active={track.id === selectedId} key={track.id} label={track.name || tx(`Piste ${track.id}`, `Track ${track.id}`)} onPress={() => onSelect(track.id)} />)}
       {tracks.length === 0 && <Text style={styles.trackEmpty}>{emptyLabel}</Text>}
     </ScrollView>}
   </View>;

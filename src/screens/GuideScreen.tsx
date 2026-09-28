@@ -8,6 +8,7 @@ import { Screen } from '../components/Screen';
 import { EpgRepository, type GuideProgramme } from '../repositories/EpgRepository';
 import { alignToEpgSlot, EPG_PIXELS_PER_MINUTE, EPG_SLOT_MINUTES, EPG_WINDOW_HOURS, epgProgrammeLayout, isProgrammeLive, shiftHours } from '../services/epgTimeline';
 import { colors, radii, spacing } from '../theme/tokens';
+import { getAppLanguage, translate, useI18n } from '../i18n';
 
 const repository = new EpgRepository();
 const CHANNEL_WIDTH = 220;
@@ -18,6 +19,7 @@ type GuideView = 'now' | 'grid' | 'programme';
 type ChannelSchedule = { channelId: string; channelName: string; programmes: GuideProgramme[] };
 
 export function GuideScreen() {
+  const { tx } = useI18n();
   const router = useRouter();
   const { width } = useWindowDimensions();
   const compact = !Platform.isTV && width < 600;
@@ -69,39 +71,39 @@ export function GuideScreen() {
   }, []);
 
   return <Screen navigation><View style={[styles.container, compact && styles.containerCompact]}>
-    <PageHeader eyebrow="PROGRAMMES" title="Guide TV" subtitle={`${formatDay(windowStart)} · ${formatTime(windowStart)}–${formatTime(windowEnd)}`} />
+    <PageHeader eyebrow={tx('PROGRAMMES', 'PROGRAMS')} title="TV Guide" subtitle={`${formatDay(windowStart)} · ${formatTime(windowStart)}–${formatTime(windowEnd)}`} />
     <View style={styles.toolbar}>
       <View style={styles.filters}>
-        <FilterChip active={view === 'now'} label="Maintenant" onPress={resetToNow} />
-        <FilterChip active={view === 'grid'} label="Grille" onPress={() => setView('grid')} />
-        <FilterChip active={view === 'programme'} label="Programme" onPress={() => { if (selected) setView('programme'); }} />
+        <FilterChip active={view === 'now'} label={tx('Maintenant', 'Now')} onPress={resetToNow} />
+        <FilterChip active={view === 'grid'} label={tx('Grille', 'Schedule')} onPress={() => setView('grid')} />
+        <FilterChip active={view === 'programme'} label={tx('Programme', 'Program')} onPress={() => { if (selected) setView('programme'); }} />
       </View>
       <View style={styles.navigation}>
-        <ActionButton icon="chevron-back" label="Jour précédent" onPress={() => moveDay(-1)} variant="secondary" />
-        <ActionButton label="Aujourd’hui" onPress={resetToNow} variant="secondary" />
-        <ActionButton icon="chevron-forward" label="Jour suivant" onPress={() => moveDay(1)} variant="secondary" />
+        <ActionButton icon="chevron-back" label={tx('Jour précédent', 'Previous day')} onPress={() => moveDay(-1)} variant="secondary" />
+        <ActionButton label={tx('Aujourd’hui', 'Today')} onPress={resetToNow} variant="secondary" />
+        <ActionButton icon="chevron-forward" label={tx('Jour suivant', 'Next day')} onPress={() => moveDay(1)} variant="secondary" />
       </View>
     </View>
 
     {view === 'programme' && selected ? <ProgrammeDetail item={selected} onBack={() => setView('grid')} onWatch={() => router.push({ pathname: '/player/[channelId]', params: { channelId: selected.channelId } })} />
       : loading ? <LoadingSkeleton rows={6} />
-        : items.length === 0 ? <EmptyState icon="calendar-outline" title="Guide indisponible" detail="Aucun programme n’est disponible sur ce créneau. Vérifiez la source XMLTV ou choisissez un autre jour." />
+        : items.length === 0 ? <EmptyState icon="calendar-outline" title={tx('Guide indisponible', 'Guide unavailable')} detail={tx('Aucun programme n’est disponible sur ce créneau. Vérifiez la source XMLTV ou choisissez un autre jour.', 'No program is available in this time slot. Check the XMLTV source or choose another day.')} />
           : view === 'now' ? <NowList items={liveItems} now={now} onSelect={openProgramme} />
             : <GuideGrid items={schedules} now={now} onSelect={openProgramme} windowEnd={windowEnd} windowStart={windowStart} />}
 
-    {view === 'grid' && <View style={styles.slotNavigation}><ActionButton icon="play-back" label="-2 h" onPress={() => setWindowStart((current) => shiftHours(current, -2))} variant="secondary" /><ActionButton icon="locate" label="Maintenant" onPress={resetToNow} variant="secondary" /><ActionButton icon="play-forward" label="+2 h" onPress={() => setWindowStart((current) => shiftHours(current, 2))} variant="secondary" /></View>}
+    {view === 'grid' && <View style={styles.slotNavigation}><ActionButton icon="play-back" label="-2 h" onPress={() => setWindowStart((current) => shiftHours(current, -2))} variant="secondary" /><ActionButton icon="locate" label={tx('Maintenant', 'Now')} onPress={resetToNow} variant="secondary" /><ActionButton icon="play-forward" label="+2 h" onPress={() => setWindowStart((current) => shiftHours(current, 2))} variant="secondary" /></View>}
   </View></Screen>;
 }
 
 function NowList({ items, now, onSelect }: { items: GuideProgramme[]; now: number; onSelect: (item: GuideProgramme) => void }) {
-  if (items.length === 0) return <EmptyState icon="time-outline" title="Aucun direct renseigné" detail="La grille existe, mais aucun programme ne couvre l’heure actuelle." />;
+  if (items.length === 0) return <EmptyState icon="time-outline" title={translate('Aucun direct renseigné', 'No live programs listed')} detail={translate('La grille existe, mais aucun programme ne couvre l’heure actuelle.', 'The schedule exists, but no program covers the current time.')} />;
   return <FlatList contentContainerStyle={styles.list} data={items} initialNumToRender={14} keyExtractor={(item) => item.id} maxToRenderPerBatch={14} removeClippedSubviews renderItem={({ item, index }) => {
     const duration = new Date(item.endsAt).getTime() - new Date(item.startsAt).getTime();
     const progress = duration > 0 ? Math.max(0, Math.min(1, (now - new Date(item.startsAt).getTime()) / duration)) : 0;
     return <FocusableCard autoFocus={index === 0} onPress={() => onSelect(item)} style={styles.nowRow}>
       <View style={styles.nowTime}><Text style={styles.timeText}>{formatTime(new Date(item.startsAt))}</Text><Text numberOfLines={1} style={styles.channel}>{item.channelName}</Text></View>
       <View style={styles.nowProgramme}><Text numberOfLines={1} style={styles.programmeTitle}>{item.title}</Text><View style={styles.track}><View style={[styles.progress, { width: `${progress * 100}%` }]} /></View></View>
-      <Text style={styles.live}>● DIRECT</Text>
+      <Text style={styles.live}>{translate('● DIRECT', '● LIVE')}</Text>
     </FocusableCard>;
   }} windowSize={7} />;
 }
@@ -127,15 +129,15 @@ function GuideGrid({ items, now, onSelect, windowEnd, windowStart }: { items: Ch
 
 function TimelineHeader({ now, windowEnd, windowStart }: { now: number; windowEnd: Date; windowStart: Date }) {
   const slots = Array.from({ length: EPG_WINDOW_HOURS * 60 / EPG_SLOT_MINUTES }, (_, index) => new Date(windowStart.getTime() + index * EPG_SLOT_MINUTES * 60_000));
-  return <View style={styles.timelineHeader}><View style={styles.timelineCorner}><Text style={styles.timelineCornerText}>CHAÎNES</Text></View><View style={styles.timeline}>{slots.map((slot) => <View key={slot.toISOString()} style={styles.slot}><Text style={styles.slotText}>{formatTime(slot)}</Text></View>)}{now >= windowStart.getTime() && now < windowEnd.getTime() && <View style={[styles.nowHeaderLine, { left: (now - windowStart.getTime()) / 60_000 * EPG_PIXELS_PER_MINUTE }]} />}</View></View>;
+  return <View style={styles.timelineHeader}><View style={styles.timelineCorner}><Text style={styles.timelineCornerText}>{translate('CHAÎNES', 'CHANNELS')}</Text></View><View style={styles.timeline}>{slots.map((slot) => <View key={slot.toISOString()} style={styles.slot}><Text style={styles.slotText}>{formatTime(slot)}</Text></View>)}{now >= windowStart.getTime() && now < windowEnd.getTime() && <View style={[styles.nowHeaderLine, { left: (now - windowStart.getTime()) / 60_000 * EPG_PIXELS_PER_MINUTE }]} />}</View></View>;
 }
 
 function ProgrammeDetail({ item, onBack, onWatch }: { item: GuideProgramme; onBack: () => void; onWatch: () => void }) {
-  return <Panel style={styles.detailPanel}><Text style={styles.detailEyebrow}>{item.channelName.toUpperCase()}</Text><Text style={styles.detailTitle}>{item.title}</Text><Text style={styles.detailSchedule}>{formatDay(new Date(item.startsAt))} · {formatTime(new Date(item.startsAt))}–{formatTime(new Date(item.endsAt))}</Text><Text style={styles.detailDescription}>{item.description?.trim() || 'Aucune description fournie par le guide.'}</Text><View style={styles.detailActions}><ActionButton autoFocus icon="play" label="Regarder la chaîne" onPress={onWatch} /><ActionButton icon="arrow-back" label="Retour à la grille" onPress={onBack} variant="secondary" /></View></Panel>;
+  return <Panel style={styles.detailPanel}><Text style={styles.detailEyebrow}>{item.channelName.toUpperCase()}</Text><Text style={styles.detailTitle}>{item.title}</Text><Text style={styles.detailSchedule}>{formatDay(new Date(item.startsAt))} · {formatTime(new Date(item.startsAt))}–{formatTime(new Date(item.endsAt))}</Text><Text style={styles.detailDescription}>{item.description?.trim() || translate('Aucune description fournie par le guide.', 'No description provided by the guide.')}</Text><View style={styles.detailActions}><ActionButton autoFocus icon="play" label={translate('Regarder la chaîne', 'Watch channel')} onPress={onWatch} /><ActionButton icon="arrow-back" label={translate('Retour à la grille', 'Back to schedule')} onPress={onBack} variant="secondary" /></View></Panel>;
 }
 
-function formatTime(date: Date) { return date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }); }
-function formatDay(date: Date) { return date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }); }
+function formatTime(date: Date) { return date.toLocaleTimeString(getAppLanguage() === 'fr' ? 'fr-FR' : 'en-US', { hour: '2-digit', minute: '2-digit' }); }
+function formatDay(date: Date) { return date.toLocaleDateString(getAppLanguage() === 'fr' ? 'fr-FR' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long' }); }
 
 const styles = StyleSheet.create({
   container: { flex: 1, gap: spacing.md, padding: spacing.xl },

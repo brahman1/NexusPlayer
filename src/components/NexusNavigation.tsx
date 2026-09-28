@@ -4,31 +4,34 @@ import { useState } from 'react';
 import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { colors, layout, spacing } from '../theme/tokens';
+import { useI18n } from '../i18n';
 import { FocusableCard } from './FocusableCard';
 
 const items = [
-  ['Accueil', 'home-outline', '/(tabs)'],
-  ['Live', 'radio-outline', '/(tabs)/live'],
-  ['Guide', 'calendar-outline', '/(tabs)/guide'],
-  ['Films', 'film-outline', '/(tabs)/movies'],
-  ['Séries', 'albums-outline', '/(tabs)/series'],
-  ['Recherche', 'search-outline', '/(tabs)/search'],
-  ['Ma liste', 'bookmark-outline', '/(tabs)/my-list'],
-  ['Sources', 'server-outline', '/(tabs)/library'],
-  ['Réglages', 'settings-outline', '/(tabs)/settings'],
+  ['Accueil', 'Home', 'home-outline', '/(tabs)'],
+  ['Live', 'Live', 'radio-outline', '/(tabs)/live'],
+  ['Guide', 'Guide', 'calendar-outline', '/(tabs)/guide'],
+  ['Films', 'Movies', 'film-outline', '/(tabs)/movies'],
+  ['Séries', 'Series', 'albums-outline', '/(tabs)/series'],
+  ['Recherche', 'Search', 'search-outline', '/(tabs)/search'],
+  ['Favoris', 'Favorites', 'heart-outline', '/(tabs)/my-list'],
+  ['Sources', 'Sources', 'server-outline', '/(tabs)/library'],
+  ['Réglages', 'Settings', 'settings-outline', '/(tabs)/settings'],
 ] as const;
 
 export function NexusSidebar() {
   const router = useRouter();
   const pathname = usePathname();
   const [expanded, setExpanded] = useState(false);
+  const { tx } = useI18n();
   if (!Platform.isTV) return null;
 
   return (
-    <View accessibilityLabel="Navigation principale" style={[styles.sidebar, expanded && styles.sidebarExpanded]}>
+    <View accessibilityLabel={tx('Navigation principale', 'Main navigation')} style={[styles.sidebar, expanded && styles.sidebarExpanded]}>
       <View style={styles.brand}><Ionicons color={colors.text} name="play" size={26} /></View>
       <ScrollView contentContainerStyle={styles.navigationItems} onFocus={() => setExpanded(true)} onBlur={() => setExpanded(false)} showsVerticalScrollIndicator={expanded}>
-      {items.map(([label, icon, href], index) => {
+      {items.map(([french, english, icon, href], index) => {
+        const label = tx(french, english);
         const active = href === '/(tabs)' ? pathname === '/' || pathname.endsWith('/index') : pathname.includes(href.split('/').pop()!);
         return (
           <FocusableCard accessibilityLabel={label} accessibilityRole="button" autoFocus={index === 0 && pathname === '/'} key={href} onPress={() => router.push(href as Href)} style={[styles.item, active && styles.active]}>

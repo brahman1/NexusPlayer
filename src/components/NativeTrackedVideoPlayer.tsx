@@ -8,6 +8,7 @@ import { describePlaybackError } from '../services/playbackError';
 import { mediaExtension } from '../services/playbackStrategy';
 import { colors, spacing } from '../theme/tokens';
 import type { TrackedVideoPlayerProps } from './TrackedVideoPlayer';
+import { useI18n } from '../i18n';
 
 const progressRepository = new WatchProgressRepository();
 
@@ -17,6 +18,7 @@ function sourceFor(uri: string): VideoSource {
 }
 
 export function NativeTrackedVideoPlayer({ mediaId, mediaKind, name, nextEpisode, onEnded, onFatalError, onFullscreenChange, onReady, onProgress, resumeSeconds, uri }: TrackedVideoPlayerProps) {
+  const { tx } = useI18n();
   const lastSaved = useRef(resumeSeconds);
   const latestPosition = useRef(resumeSeconds);
   const latestDuration = useRef(0);
@@ -30,7 +32,7 @@ export function NativeTrackedVideoPlayer({ mediaId, mediaKind, name, nextEpisode
     instance.play();
   });
   const { status, error } = useEvent(player, 'statusChange', { status: player.status, error: undefined });
-  const problem = status === 'error' ? describePlaybackError(error?.message ?? 'Erreur du lecteur natif.') : null;
+  const problem = status === 'error' ? describePlaybackError(error?.message ?? tx('Erreur du lecteur natif.', 'Native player error.')) : null;
 
   const save = useCallback((force = false) => {
     if (completed.current || latestDuration.current <= 0) return;
@@ -51,8 +53,8 @@ export function NativeTrackedVideoPlayer({ mediaId, mediaKind, name, nextEpisode
 
   useEffect(() => {
     if (status === 'readyToPlay') onReady?.();
-    if (status === 'error') onFatalError?.(error?.message ?? 'Erreur du lecteur natif.');
-  }, [error?.message, onFatalError, onReady, status]);
+    if (status === 'error') onFatalError?.(error?.message ?? tx('Erreur du lecteur natif.', 'Native player error.'));
+  }, [error?.message, onFatalError, onReady, status, tx]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => { if (state !== 'active') save(true); });
@@ -64,7 +66,7 @@ export function NativeTrackedVideoPlayer({ mediaId, mediaKind, name, nextEpisode
       <VideoView allowsPictureInPicture contentFit="contain" fullscreenOptions={{ enable: true }} nativeControls onFullscreenEnter={() => onFullscreenChange?.(true)} onFullscreenExit={() => onFullscreenChange?.(false)} player={player} startsPictureInPictureAutomatically style={styles.video} />
       {problem && <View style={styles.error}><Text style={styles.errorTitle}>{problem.title}</Text><Text style={styles.errorDetail}>{problem.detail}</Text></View>}
     </View>
-    <View style={styles.details}><Text numberOfLines={2} style={styles.title}>{name}</Text>{nextEpisode && <Pressable accessibilityLabel={`Lire l’épisode suivant, ${nextEpisode.name}`} accessibilityRole="button" onPress={nextEpisode.onPress} style={styles.nextButton}><Text style={styles.nextLabel}>Épisode suivant</Text></Pressable>}</View>
+    <View style={styles.details}><Text numberOfLines={2} style={styles.title}>{name}</Text>{nextEpisode && <Pressable accessibilityLabel={tx(`Lire l’épisode suivant, ${nextEpisode.name}`, `Play next episode, ${nextEpisode.name}`)} accessibilityRole="button" onPress={nextEpisode.onPress} style={styles.nextButton}><Text style={styles.nextLabel}>{tx('Épisode suivant', 'Next episode')}</Text></Pressable>}</View>
   </View>;
 }
 

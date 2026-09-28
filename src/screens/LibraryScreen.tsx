@@ -24,6 +24,7 @@ import type { Playlist } from '../types/domain';
 import { endpointForDisplay } from '../utils/endpoint';
 import { refreshXtreamPlaylist, removeXtreamCredentials } from '../services/xtreamImportService';
 import { sumXtreamSyncReport } from '../services/xtreamSync';
+import { useI18n } from '../i18n';
 
 const repository = new SQLitePlaylistRepository();
 
@@ -36,6 +37,7 @@ function ActionButton({ label, onPress, disabled = false }: { label: string; onP
 }
 
 export function LibraryScreen() {
+  const { language, tx } = useI18n();
   const router = useRouter();
   const { width } = useWindowDimensions();
   const compact = !Platform.isTV && width < 600;
@@ -53,32 +55,32 @@ export function LibraryScreen() {
       setError(null);
       setPlaylists(await repository.list());
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : 'Impossible de charger la bibliothèque.');
+      setError(caughtError instanceof Error ? caughtError.message : tx('Impossible de charger la bibliothèque.', 'Unable to load the library.'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [tx]);
 
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
   function requestDelete(playlist: Playlist) {
     Alert.alert(
-      'Supprimer la playlist ?',
-      `« ${playlist.name} » et ses ${playlist.channelCount} chaînes seront supprimées de cet appareil.`,
+      tx('Supprimer la playlist ?', 'Delete playlist?'),
+      tx(`« ${playlist.name} » et ses ${playlist.channelCount} chaînes seront supprimées de cet appareil.`, `"${playlist.name}" and its ${playlist.channelCount} channels will be deleted from this device.`),
       [
-        { text: 'Annuler', style: 'cancel' },
+        { text: tx('Annuler', 'Cancel'), style: 'cancel' },
         {
-          text: 'Supprimer',
+          text: tx('Supprimer', 'Delete'),
           style: 'destructive',
           onPress: () => {
             setBusyId(playlist.id);
             (playlist.sourceKind === 'xtream' ? removeXtreamCredentials(playlist.id) : Promise.resolve())
               .then(() => repository.remove(playlist.id))
               .then(() => {
-                setNotice(`« ${playlist.name} » a été supprimée.`);
+                setNotice(tx(`« ${playlist.name} » a été supprimée.`, `"${playlist.name}" was deleted.`));
                 return load();
               })
-              .catch((caught) => setError(caught instanceof Error ? caught.message : 'Suppression impossible.'))
+              .catch((caught) => setError(caught instanceof Error ? caught.message : tx('Suppression impossible.', 'Unable to delete.')))
               .finally(() => setBusyId(null));
           },
         },
@@ -89,23 +91,22 @@ export function LibraryScreen() {
   async function refresh(playlist: Playlist) {
     setBusyId(playlist.id);
     setError(null);
-    setNotice(`Actualisation de « ${playlist.name} »…`);
+    setNotice(tx(`Actualisation de « ${playlist.name} »…`, `Refreshing "${playlist.name}"…`));
     try {
       if (playlist.sourceKind === 'xtream') {
         const report = sumXtreamSyncReport(await refreshXtreamPlaylist(playlist));
-        setNotice(`Xtream synchronisé : +${report.added}, ${report.modified} modifiés, ${report.removed} supprimés, ${report.unchanged} inchangés.`);
+        setNotice(tx(`Xtream synchronisé : +${report.added}, ${report.modified} modifiés, ${report.removed} supprimés, ${report.unchanged} inchangés.`, `Xtream synced: +${report.added}, ${report.modified} modified, ${report.removed} removed, ${report.unchanged} unchanged.`));
         await load();
         return;
       }
       const report = await refreshM3uPlaylist(playlist);
       setNotice(report.notModified
-        ? `« ${playlist.name} » est déjà à jour (${report.total} chaînes).`
-        : `${report.total} chaînes : +${report.added}, ${report.modified} modifiées, ` +
-          `${report.removed} supprimées, ${report.unchanged} inchangées.`);
+        ? tx(`« ${playlist.name} » est déjà à jour (${report.total} chaînes).`, `"${playlist.name}" is already up to date (${report.total} channels).`)
+        : tx(`${report.total} chaînes : +${report.added}, ${report.modified} modifiées, ${report.removed} supprimées, ${report.unchanged} inchangées.`, `${report.total} channels: +${report.added}, ${report.modified} modified, ${report.removed} removed, ${report.unchanged} unchanged.`));
       await load();
     } catch (caught) {
-      setNotice('La dernière version valide a été conservée.');
-      setError(caught instanceof Error ? caught.message : 'Actualisation impossible.');
+      setNotice(tx('La dernière version valide a été conservée.', 'The latest valid version was kept.'));
+      setError(caught instanceof Error ? caught.message : tx('Actualisation impossible.', 'Unable to refresh.'));
       await load();
     } finally {
       setBusyId(null);
@@ -122,17 +123,17 @@ export function LibraryScreen() {
     if (!renaming) return;
     const nextName = renameValue.trim();
     if (!nextName) {
-      setError('Le nom de la playlist est obligatoire.');
+      setError(tx('Le nom de la playlist est obligatoire.', 'The playlist name is required.'));
       return;
     }
     setBusyId(renaming.id);
     try {
       await repository.rename(renaming.id, nextName);
       setRenaming(null);
-      setNotice('Playlist renommée.');
+      setNotice(tx('Playlist renommée.', 'Playlist renamed.'));
       await load();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Impossible de renommer la playlist.');
+      setError(caught instanceof Error ? caught.message : tx('Impossible de renommer la playlist.', 'Unable to rename the playlist.'));
     } finally {
       setBusyId(null);
     }
@@ -141,13 +142,13 @@ export function LibraryScreen() {
   return (
     <Screen navigation>
       <View style={[styles.container, compact && styles.containerCompact]}>
-        <PageHeader eyebrow="SOURCES" title="Vos sources" subtitle={`${playlists.length} source${playlists.length > 1 ? 's' : ''} configurée${playlists.length > 1 ? 's' : ''}`} action={<PrimaryButton label="Ajouter" onPress={() => router.push('/add-playlist')} />} />
+        <PageHeader eyebrow="SOURCES" title={tx('Vos sources', 'Your sources')} subtitle={tx(`${playlists.length} source${playlists.length > 1 ? 's' : ''} configurée${playlists.length > 1 ? 's' : ''}`, `${playlists.length} configured source${playlists.length > 1 ? 's' : ''}`)} action={<PrimaryButton label={tx('Ajouter', 'Add')} onPress={() => router.push('/add-playlist')} />} />
 
         {notice && <StatusBanner kind="success" title={notice} />}
         {error && <StatusBanner kind="error" title={error} />}
 
         {loading ? <ActivityIndicator color={colors.accentStrong} size="large" /> : playlists.length === 0 ? (
-          <EmptyState icon="server-outline" title="Aucune source importée" detail="Ajoutez un lien M3U, un fichier local ou un abonnement Xtream pour commencer." action={<PrimaryButton label="Ajouter une source" onPress={() => router.push('/add-playlist')} />} />
+          <EmptyState icon="server-outline" title={tx('Aucune source importée', 'No source imported')} detail={tx('Ajoutez un lien M3U, un fichier local ou un abonnement Xtream pour commencer.', 'Add an M3U link, local file or Xtream subscription to get started.')} action={<PrimaryButton label={tx('Ajouter une source', 'Add a source')} onPress={() => router.push('/add-playlist')} />} />
         ) : (
           <FlatList
             contentContainerStyle={styles.list}
@@ -165,12 +166,12 @@ export function LibraryScreen() {
                   >
                     <Text style={styles.playlistName}>{item.name}</Text>
                     <Text style={styles.meta}>
-                      {item.channelCount} chaînes · {item.sourceKind === 'm3u-file' ? 'Fichier local' : item.sourceKind === 'xtream' ? 'Xtream Codes' : 'Lien M3U'}
+                      {tx(`${item.channelCount} chaînes`, `${item.channelCount} channels`)} · {item.sourceKind === 'm3u-file' ? tx('Fichier local', 'Local file') : item.sourceKind === 'xtream' ? 'Xtream Codes' : tx('Lien M3U', 'M3U link')}
                     </Text>
                     <Text numberOfLines={1} style={styles.endpoint}>{endpointForDisplay(item.endpoint)}</Text>
                     {item.lastError && <Text style={styles.cardError}>{item.lastError}</Text>}
                   </FocusableCard>
-                  <View style={styles.actions}><ActionButton disabled={busy} label={busy ? 'Traitement…' : 'Gérer'} onPress={() => setManaging(item)} /></View>
+                  <View style={styles.actions}><ActionButton disabled={busy} label={busy ? tx('Traitement…', 'Processing…') : tx('Gérer', 'Manage')} onPress={() => setManaging(item)} /></View>
                 </View>
               );
             }}
@@ -183,11 +184,11 @@ export function LibraryScreen() {
           <Text style={styles.modalTitle}>{managing?.name}</Text>
           <Text style={styles.endpoint}>{endpointForDisplay(managing?.endpoint ?? null)}</Text>
           <View style={styles.actions}>
-            <PrimaryButton label="Renommer" onPress={() => managing && openRename(managing)} />
-            <PrimaryButton disabled={managing?.sourceKind !== 'm3u-url' && managing?.sourceKind !== 'xtream'} label="Actualiser" onPress={() => { const item = managing; setManaging(null); if (item) void refresh(item); }} />
-            <PrimaryButton label="Diagnostiquer" onPress={() => { if (managing) setNotice(`${managing.sourceKind.toUpperCase()} · ${managing.channelCount} chaînes · dernière synchronisation ${managing.lastSyncedAt ? new Date(managing.lastSyncedAt).toLocaleString() : 'inconnue'}. Adresse et identifiants masqués.`); setManaging(null); }} />
-            <PrimaryButton label="Supprimer" onPress={() => { const item = managing; setManaging(null); if (item) requestDelete(item); }} />
-            <PrimaryButton label="Fermer" onPress={() => setManaging(null)} />
+            <PrimaryButton label={tx('Renommer', 'Rename')} onPress={() => managing && openRename(managing)} />
+            <PrimaryButton disabled={managing?.sourceKind !== 'm3u-url' && managing?.sourceKind !== 'xtream'} label={tx('Actualiser', 'Refresh')} onPress={() => { const item = managing; setManaging(null); if (item) void refresh(item); }} />
+            <PrimaryButton label={tx('Diagnostiquer', 'Diagnose')} onPress={() => { if (managing) setNotice(tx(`${managing.sourceKind.toUpperCase()} · ${managing.channelCount} chaînes · dernière synchronisation ${managing.lastSyncedAt ? new Date(managing.lastSyncedAt).toLocaleString(language === 'fr' ? 'fr-FR' : 'en-US') : 'inconnue'}. Adresse et identifiants masqués.`, `${managing.sourceKind.toUpperCase()} · ${managing.channelCount} channels · last sync ${managing.lastSyncedAt ? new Date(managing.lastSyncedAt).toLocaleString('en-US') : 'unknown'}. Address and credentials hidden.`)); setManaging(null); }} />
+            <PrimaryButton label={tx('Supprimer', 'Delete')} onPress={() => { const item = managing; setManaging(null); if (item) requestDelete(item); }} />
+            <PrimaryButton label={tx('Fermer', 'Close')} onPress={() => setManaging(null)} />
           </View>
         </View></View>
       </Modal>
@@ -195,7 +196,7 @@ export function LibraryScreen() {
       <Modal animationType="fade" onRequestClose={() => setRenaming(null)} transparent visible={Boolean(renaming)}>
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Renommer la playlist</Text>
+            <Text style={styles.modalTitle}>{tx('Renommer la playlist', 'Rename playlist')}</Text>
             <TextInput
               autoFocus
               maxLength={80}
@@ -206,8 +207,8 @@ export function LibraryScreen() {
               value={renameValue}
             />
             <View style={styles.actions}>
-              <PrimaryButton label="Enregistrer" onPress={() => void submitRename()} />
-              <PrimaryButton label="Annuler" onPress={() => setRenaming(null)} />
+              <PrimaryButton label={tx('Enregistrer', 'Save')} onPress={() => void submitRename()} />
+              <PrimaryButton label={tx('Annuler', 'Cancel')} onPress={() => setRenaming(null)} />
             </View>
           </View>
         </View>

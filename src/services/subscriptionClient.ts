@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 
 import { getOrCreateDeviceIdentity, loadAccountSession } from '../storage/accountVault';
 import type { RegisteredDevice, SubscriptionEntitlement } from '../types/account';
+import { translate } from '../i18n';
 
 type Fetcher = typeof fetch;
 
@@ -10,13 +11,13 @@ export class SubscriptionClient {
 
   private async request<T>(path: string, init?: RequestInit): Promise<T> {
     const session = await loadAccountSession();
-    if (!session) throw new Error('Connexion au compte requise.');
+    if (!session) throw new Error(translate('Connexion au compte requise.', 'Account sign-in required.'));
     const response = await this.fetcher(`${this.baseUrl.replace(/\/$/, '')}${path}`, {
       ...init,
       headers: { Accept: 'application/json', Authorization: `Bearer ${session.accessToken}`, 'Content-Type': 'application/json', ...init?.headers },
     });
-    if (response.status === 401) throw new Error('La session a expiré. Reconnectez-vous.');
-    if (!response.ok) throw new Error('Le service d’abonnement est momentanément indisponible.');
+    if (response.status === 401) throw new Error(translate('La session a expiré. Reconnectez-vous.', 'The session has expired. Sign in again.'));
+    if (!response.ok) throw new Error(translate('Le service d’abonnement est momentanément indisponible.', 'The subscription service is temporarily unavailable.'));
     return response.json() as Promise<T>;
   }
 

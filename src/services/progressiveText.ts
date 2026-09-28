@@ -1,7 +1,9 @@
+import { translate } from '../i18n';
+
 export async function readResponseTextProgressively(response: Response, maxBytes: number) {
   if (!response.body) {
     const bytes = new Uint8Array(await response.arrayBuffer());
-    if (bytes.byteLength > maxBytes) throw new Error('Le téléchargement dépasse la taille maximale autorisée.');
+    if (bytes.byteLength > maxBytes) throw new Error(translate('Le téléchargement dépasse la taille maximale autorisée.', 'The download exceeds the maximum allowed size.'));
     return new TextDecoder().decode(bytes);
   }
   const reader = response.body.getReader();
@@ -15,7 +17,7 @@ export async function readResponseTextProgressively(response: Response, maxBytes
       received += value.byteLength;
       if (received > maxBytes) {
         await reader.cancel();
-        throw new Error('Le téléchargement dépasse la taille maximale autorisée.');
+        throw new Error(translate('Le téléchargement dépasse la taille maximale autorisée.', 'The download exceeds the maximum allowed size.'));
       }
       chunks.push(decoder.decode(value, { stream: true }));
     }

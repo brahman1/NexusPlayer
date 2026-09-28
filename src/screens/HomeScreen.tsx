@@ -9,6 +9,7 @@ import { DiscoveryRepository } from '../repositories/DiscoveryRepository';
 import { SQLitePlaylistRepository } from '../repositories/SQLitePlaylistRepository';
 import { ContinueWatchingItem, WatchProgressRepository } from '../repositories/WatchProgressRepository';
 import { colors, gradients, spacing } from '../theme/tokens';
+import { useI18n } from '../i18n';
 import type { Channel, Playlist } from '../types/domain';
 
 const discovery = new DiscoveryRepository();
@@ -16,6 +17,7 @@ const playlistsRepository = new SQLitePlaylistRepository();
 const progressRepository = new WatchProgressRepository();
 
 export function HomeScreen() {
+  const { tx } = useI18n();
   const router = useRouter();
   const { width } = useWindowDimensions();
   const compact = !Platform.isTV && width < 600;
@@ -36,13 +38,13 @@ export function HomeScreen() {
   const resume = (item: ContinueWatchingItem) => router.push({ pathname: item.mediaKind === 'movie' ? '/watch/movie/[id]' : '/watch/episode/[id]', params: { id: item.mediaId } });
   const hero = recent[0] ?? live[0];
   return <Screen navigation><ScrollView contentContainerStyle={[styles.container, compact && styles.containerCompact]}>
-    <PageHeader eyebrow="NEXUSPLAYER" title="Bonsoir" subtitle={playlists.length ? `${playlists.length} source${playlists.length > 1 ? 's' : ''} prête${playlists.length > 1 ? 's' : ''} à regarder` : 'Votre médiathèque personnelle, sans contenu imposé.'} action={<View style={[styles.headerActions, compact && styles.headerActionsCompact]}><ActionButton icon="add" label="Ajouter une source" onPress={() => router.push('/add-playlist')} style={compact && styles.headerButton} /><ActionButton icon="search" label="Rechercher" onPress={() => router.push('/(tabs)/search')} style={compact && styles.headerButton} variant="secondary" /></View>} />
-    {loading ? <LoadingSkeleton rows={5} /> : playlists.length === 0 ? <EmptyState icon="add-circle-outline" title="Ajoutez votre première source" detail="Importez une playlist M3U ou connectez un abonnement Xtream Codes que vous êtes autorisé à utiliser." action={<ActionButton autoFocus icon="add" label="Ajouter une source" onPress={() => router.push('/add-playlist')} />} /> : <>
-      <Panel style={[styles.hero, compact && styles.heroCompact]}><LinearGradient colors={gradients.hero} end={{ x: 1, y: 1 }} pointerEvents="none" start={{ x: 0, y: 0 }} style={StyleSheet.absoluteFill} /><View style={styles.heroText}><Text style={styles.heroEyebrow}>{recent[0] ? 'REPRENDRE' : 'EN DIRECT MAINTENANT'}</Text><Text numberOfLines={2} style={[styles.heroTitle, compact && styles.heroTitleCompact]}>{hero?.name ?? 'Votre Live est prêt'}</Text><Text style={styles.heroDescription}>Retrouvez immédiatement votre dernière chaîne ou explorez le direct.</Text><ActionButton autoFocus icon="play" label="Regarder" onPress={() => hero && play(hero)} /></View></Panel>
-      {continueWatching.length > 0 && <ContentRail data={continueWatching} keyExtractor={(item) => `${item.mediaKind}:${item.mediaId}`} renderItem={({ item }) => <MediaPoster imageUrl={item.imageUrl} meta={`${item.subtitle ? `${item.subtitle} · ` : ''}Reprendre à ${Math.floor(item.positionSeconds / 60)} min`} onPress={() => resume(item)} progress={item.positionSeconds / item.durationSeconds} title={item.title} />} title="Continuer à regarder" />}
-      {recent.length > 0 && <ContentRail data={recent} keyExtractor={(item) => item.id} renderItem={({ item }) => <ChannelTile channel={item} onPress={() => play(item)} />} title="Reprendre" />}
-      <ContentRail data={live} keyExtractor={(item) => item.id} renderItem={({ item }) => <ChannelTile channel={item} onPress={() => play(item)} />} title="En direct maintenant" />
-      {favorites.length > 0 && <ContentRail data={favorites} keyExtractor={(item) => item.id} renderItem={({ item }) => <ChannelTile channel={item} onPress={() => play(item)} />} title="Favoris" />}
+    <PageHeader eyebrow="NEXUSPLAYER" title={tx('Bonsoir', 'Welcome')} subtitle={playlists.length ? tx(`${playlists.length} source${playlists.length > 1 ? 's' : ''} prête${playlists.length > 1 ? 's' : ''} à regarder`, `${playlists.length} source${playlists.length > 1 ? 's' : ''} ready to watch`) : tx('Votre médiathèque personnelle, sans contenu imposé.', 'Your personal media library, with no imposed content.')} action={<View style={[styles.headerActions, compact && styles.headerActionsCompact]}><ActionButton icon="add" label={tx('Ajouter une source', 'Add a source')} onPress={() => router.push('/add-playlist')} style={compact && styles.headerButton} /><ActionButton icon="search" label={tx('Rechercher', 'Search')} onPress={() => router.push('/(tabs)/search')} style={compact && styles.headerButton} variant="secondary" /></View>} />
+    {loading ? <LoadingSkeleton rows={5} /> : playlists.length === 0 ? <EmptyState icon="add-circle-outline" title={tx('Ajoutez votre première source', 'Add your first source')} detail={tx('Importez une playlist M3U ou connectez un abonnement Xtream Codes que vous êtes autorisé à utiliser.', 'Import an M3U playlist or connect an Xtream Codes subscription you are authorized to use.')} action={<ActionButton autoFocus icon="add" label={tx('Ajouter une source', 'Add a source')} onPress={() => router.push('/add-playlist')} />} /> : <>
+      <Panel style={[styles.hero, compact && styles.heroCompact]}><LinearGradient colors={gradients.hero} end={{ x: 1, y: 1 }} pointerEvents="none" start={{ x: 0, y: 0 }} style={StyleSheet.absoluteFill} /><View style={styles.heroText}><Text style={styles.heroEyebrow}>{recent[0] ? tx('REPRENDRE', 'RESUME') : tx('EN DIRECT MAINTENANT', 'LIVE NOW')}</Text><Text numberOfLines={2} style={[styles.heroTitle, compact && styles.heroTitleCompact]}>{hero?.name ?? tx('Votre Live est prêt', 'Your Live TV is ready')}</Text><Text style={styles.heroDescription}>{tx('Retrouvez immédiatement votre dernière chaîne ou explorez le direct.', 'Return to your last channel or explore live TV.')}</Text><ActionButton autoFocus icon="play" label={tx('Regarder', 'Watch')} onPress={() => hero && play(hero)} /></View></Panel>
+      {continueWatching.length > 0 && <ContentRail data={continueWatching} keyExtractor={(item) => `${item.mediaKind}:${item.mediaId}`} renderItem={({ item }) => <MediaPoster imageUrl={item.imageUrl} meta={`${item.subtitle ? `${item.subtitle} · ` : ''}${tx(`Reprendre à ${Math.floor(item.positionSeconds / 60)} min`, `Resume at ${Math.floor(item.positionSeconds / 60)} min`)}`} onPress={() => resume(item)} progress={item.positionSeconds / item.durationSeconds} title={item.title} />} title={tx('Continuer à regarder', 'Continue watching')} />}
+      {recent.length > 0 && <ContentRail data={recent} keyExtractor={(item) => item.id} renderItem={({ item }) => <ChannelTile channel={item} onPress={() => play(item)} />} title={tx('Reprendre', 'Resume')} />}
+      <ContentRail data={live} keyExtractor={(item) => item.id} renderItem={({ item }) => <ChannelTile channel={item} onPress={() => play(item)} />} title={tx('En direct maintenant', 'Live now')} />
+      {favorites.length > 0 && <ContentRail data={favorites} keyExtractor={(item) => item.id} renderItem={({ item }) => <ChannelTile channel={item} onPress={() => play(item)} />} title={tx('Favoris', 'Favorites')} />}
     </>}
   </ScrollView></Screen>;
 }

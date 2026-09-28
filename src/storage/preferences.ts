@@ -11,6 +11,10 @@ const SUBTITLE_SIZE_KEY = 'subtitles.size';
 const VIDEO_CONTENT_FIT_KEY = 'playback.contentFit';
 const PLAYBACK_ENGINE_PREFIX = 'playback.engine.';
 const AUTO_SYNC_INTERVAL_KEY = 'sources.autoSyncIntervalHours';
+const CONTENT_COUNTRIES_KEY = 'content.preferredCountries';
+const CONTENT_LANGUAGES_KEY = 'content.preferredLanguages';
+const RAW_CATEGORIES_KEY = 'content.showRawCategories';
+const CATEGORY_OVERRIDES_KEY = 'content.categoryLabelOverrides';
 
 export type AutoSyncIntervalHours = 0 | 1 | 6 | 12 | 24;
 const AUTO_SYNC_INTERVALS: readonly AutoSyncIntervalHours[] = [0, 1, 6, 12, 24];
@@ -25,6 +29,20 @@ function getStorage() {
   return storage;
 }
 
+function readStringArray(key: string) {
+  try {
+    const value = JSON.parse(getStorage().getString(key) ?? '[]');
+    return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+  } catch { return []; }
+}
+
+function readStringRecord(key: string) {
+  try {
+    const value = JSON.parse(getStorage().getString(key) ?? '{}');
+    return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, string> : {};
+  } catch { return {}; }
+}
+
 export const preferences = {
   getActivePlaylistId: () => getStorage().getString(ACTIVE_PLAYLIST_KEY) ?? null,
   setActivePlaylistId: (playlistId: string | null) => {
@@ -35,7 +53,7 @@ export const preferences = {
 
     getStorage().remove(ACTIVE_PLAYLIST_KEY);
   },
-  getLanguage: () => getStorage().getString(LANGUAGE_KEY) ?? 'fr',
+  getLanguage: (): 'fr' | 'en' => getStorage().getString(LANGUAGE_KEY) === 'en' ? 'en' : 'fr',
   setLanguage: (language: 'fr' | 'en') => getStorage().set(LANGUAGE_KEY, language),
   getLastFocusedChannel: (playlistId: string) =>
     getStorage().getString(`${LAST_CHANNEL_PREFIX}${playlistId}`) ?? null,
@@ -69,4 +87,17 @@ export const preferences = {
   },
   setAutoSyncIntervalHours: (value: AutoSyncIntervalHours) =>
     getStorage().set(AUTO_SYNC_INTERVAL_KEY, value),
+  getPreferredCountries: () => readStringArray(CONTENT_COUNTRIES_KEY),
+  setPreferredCountries: (values: string[]) => getStorage().set(CONTENT_COUNTRIES_KEY, JSON.stringify([...new Set(values)])),
+  getPreferredLanguages: () => readStringArray(CONTENT_LANGUAGES_KEY),
+  setPreferredLanguages: (values: string[]) => getStorage().set(CONTENT_LANGUAGES_KEY, JSON.stringify([...new Set(values)])),
+  getShowRawCategories: () => getStorage().getBoolean(RAW_CATEGORIES_KEY) ?? false,
+  setShowRawCategories: (value: boolean) => getStorage().set(RAW_CATEGORIES_KEY, value),
+  getCategoryLabelOverrides: () => readStringRecord(CATEGORY_OVERRIDES_KEY),
+  setCategoryLabelOverride: (key: string, label: string | null) => {
+    const values = readStringRecord(CATEGORY_OVERRIDES_KEY);
+    if (label?.trim()) values[key] = label.trim();
+    else delete values[key];
+    getStorage().set(CATEGORY_OVERRIDES_KEY, JSON.stringify(values));
+  },
 };

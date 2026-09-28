@@ -19,6 +19,7 @@ import { parseM3u, type M3uParseResult } from './m3uParser';
 import { fingerprintLocalContent, fingerprintRemoteEndpoint } from './sourceIdentity';
 import { importXmltv } from './epgService';
 import { readResponseTextProgressively } from './progressiveText';
+import { translate } from '../i18n';
 
 const MAX_PLAYLIST_BYTES = 25 * 1024 * 1024;
 const DOWNLOAD_TIMEOUT_MS = 60_000;
@@ -27,13 +28,13 @@ export type M3uImportReport = M3uParseResult & { playlistId: string };
 
 function assertUsableResult(result: M3uParseResult) {
   if (result.channels.length === 0) {
-    throw new Error('Aucune chaîne HTTP ou HTTPS valide n’a été trouvée dans cette playlist.');
+    throw new Error(translate('Aucune chaîne HTTP ou HTTPS valide n’a été trouvée dans cette playlist.', 'No valid HTTP or HTTPS channel was found in this playlist.'));
   }
 }
 
 function parseContent(content: string) {
   if (content.length > MAX_PLAYLIST_BYTES) {
-    throw new Error('La playlist dépasse la taille maximale de 25 Mo.');
+    throw new Error(translate('La playlist dépasse la taille maximale de 25 Mo.', 'The playlist exceeds the maximum size of 25 MB.'));
   }
   const result = parseM3u(content);
   assertUsableResult(result);
@@ -63,11 +64,11 @@ async function downloadM3u(
     if (response.status === 304) {
       return { kind: 'not-modified' as const, httpValidators };
     }
-    if (!response.ok) throw new Error(`Le serveur a répondu avec le statut ${response.status}.`);
+    if (!response.ok) throw new Error(translate(`Le serveur a répondu avec le statut ${response.status}.`, `The server responded with status ${response.status}.`));
 
     const announcedSize = Number(response.headers.get('content-length') ?? 0);
     if (announcedSize > MAX_PLAYLIST_BYTES) {
-      throw new Error('La playlist distante dépasse la taille maximale de 25 Mo.');
+      throw new Error(translate('La playlist distante dépasse la taille maximale de 25 Mo.', 'The remote playlist exceeds the maximum size of 25 MB.'));
     }
     return {
       kind: 'content' as const,
@@ -75,9 +76,9 @@ async function downloadM3u(
       httpValidators,
     };
   } catch (error) {
-    if (externalSignal?.aborted) throw new Error('Import annulé.');
+    if (externalSignal?.aborted) throw new Error(translate('Import annulé.', 'Import canceled.'));
     if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error('Le téléchargement a dépassé 60 secondes.');
+      throw new Error(translate('Le téléchargement a dépassé 60 secondes.', 'The download exceeded 60 seconds.'));
     }
     throw error;
   } finally {
@@ -89,7 +90,7 @@ async function downloadM3u(
 export async function importM3uFromUrl(name: string, url: string, signal?: AbortSignal) {
   const download = await downloadM3u(url, signal);
   if (download.kind === 'not-modified') {
-    throw new Error('Le serveur a refusé de renvoyer la playlist lors du premier import.');
+    throw new Error(translate('Le serveur a refusé de renvoyer la playlist lors du premier import.', 'The server refused to return the playlist during the first import.'));
   }
   const result = parseContent(download.content);
   const playlistId = createId('playlist');
@@ -109,7 +110,7 @@ export async function importM3uFromUrl(name: string, url: string, signal?: Abort
 }
 
 export async function importM3uFromFile(name: string, uri: string, size?: number) {
-  if (size && size > MAX_PLAYLIST_BYTES) throw new Error('Le fichier dépasse la taille maximale de 25 Mo.');
+  if (size && size > MAX_PLAYLIST_BYTES) throw new Error(translate('Le fichier dépasse la taille maximale de 25 Mo.', 'The file exceeds the maximum size of 25 MB.'));
   const content = await new File(uri).text();
   const result = parseContent(content);
   const playlistId = createId('playlist');
@@ -129,7 +130,7 @@ export async function importM3uFromFile(name: string, uri: string, size?: number
 
 export async function refreshM3uPlaylist(playlist: Playlist, signal?: AbortSignal) {
   if (playlist.sourceKind !== 'm3u-url' || !playlist.endpoint) {
-    throw new Error('Pour actualiser un fichier local, importez-le de nouveau depuis l’appareil.');
+    throw new Error(translate('Pour actualiser un fichier local, importez-le de nouveau depuis l’appareil.', 'To refresh a local file, import it again from the device.'));
   }
 
   await setPlaylistSyncing(playlist.id);
@@ -157,7 +158,7 @@ export async function refreshM3uPlaylist(playlist: Playlist, signal?: AbortSigna
     );
     return { ...report, total: result.channels.length, notModified: false };
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Échec de l’actualisation.';
+    const message = error instanceof Error ? error.message : translate('Échec de l’actualisation.', 'Refresh failed.');
     await markPlaylistSyncFailed(playlist.id, message);
     throw error;
   }

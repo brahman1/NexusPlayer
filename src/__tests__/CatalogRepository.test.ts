@@ -58,4 +58,24 @@ describe('complete catalog access', () => {
     expect(getAllAsync).toHaveBeenCalledTimes(3);
     expect(getAllAsync.mock.calls[1]?.[0]).toContain('ROW_NUMBER() OVER');
   });
+
+  it('prioritizes preferred countries and can expose raw provider categories', async () => {
+    const getAllAsync = jest.fn()
+      .mockResolvedValueOnce([
+        { id: 'fr', name: 'Sport · France', count: 1, categoryIdsCsv: 'fr' },
+        { id: 'tr', name: 'Sport · Turquie', count: 1, categoryIdsCsv: 'tr' },
+      ])
+      .mockResolvedValueOnce([
+        { id: 'm-fr', categoryName: 'Sport · France', name: 'France', posterUrl: null, year: 2024 },
+        { id: 'm-tr', categoryName: 'Sport · Turquie', name: 'Turkey', posterUrl: null, year: 2024 },
+      ])
+      .mockResolvedValueOnce([]);
+    const getFirstAsync = jest.fn().mockResolvedValue({ total: 0 });
+    jest.mocked(getDatabase).mockResolvedValue({ getAllAsync, getFirstAsync } as never);
+
+    const result = await new CatalogRepository().overview('movie', { preferredCountries: ['TR'], showRawCategories: true });
+
+    expect(result.groups[0]).toMatchObject({ id: 'tr', preferred: true });
+    expect(getAllAsync.mock.calls[0]?.[0]).toContain('c.name AS name');
+  });
 });

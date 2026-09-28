@@ -5,6 +5,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AppBootstrap } from '../components/AppBootstrap';
 import { colors } from '../theme/tokens';
+import { useI18n } from '../i18n';
 
 const navigationTheme = {
   ...DarkTheme,
@@ -20,6 +21,7 @@ const navigationTheme = {
 };
 
 export default function RootLayout() {
+  const { tx } = useI18n();
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
@@ -37,9 +39,9 @@ export default function RootLayout() {
             >
               <Stack.Screen name="index" options={{ headerShown: false }} />
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-              <Stack.Screen name="add-playlist" options={{ title: 'Ajouter une source' }} />
-              <Stack.Screen name="playlist/[id]" options={{ title: 'Chaînes' }} />
-              <Stack.Screen name="player/[channelId]" options={{ title: 'Lecture' }} />
+              <Stack.Screen name="add-playlist" options={{ title: tx('Ajouter une source', 'Add a source') }} />
+              <Stack.Screen name="playlist/[id]" options={{ title: tx('Chaînes', 'Channels') }} />
+              <Stack.Screen name="player/[channelId]" options={{ title: tx('Lecture', 'Playback') }} />
             </Stack>
           </AppBootstrap>
         </ThemeProvider>

@@ -2,6 +2,55 @@ const COUNTRY_NAMES: Record<string, string> = {
   AM: 'Arménie', AR: 'Argentine', BE: 'Belgique', BR: 'Brésil', CA: 'Canada', CH: 'Suisse', CN: 'Chine', DE: 'Allemagne', DZ: 'Algérie', EG: 'Égypte', ES: 'Espagne', FR: 'France', GB: 'Royaume-Uni', GR: 'Grèce', IN: 'Inde', IT: 'Italie', JP: 'Japon', KR: 'Corée du Sud', MA: 'Maroc', MX: 'Mexique', NL: 'Pays-Bas', PL: 'Pologne', PT: 'Portugal', RO: 'Roumanie', RU: 'Russie', SA: 'Arabie saoudite', TN: 'Tunisie', TR: 'Turquie', US: 'États-Unis',
 };
 
+const COUNTRY_NAMES_EN: Record<string, string> = {
+  AM: 'Armenia', AR: 'Argentina', BE: 'Belgium', BR: 'Brazil', CA: 'Canada', CH: 'Switzerland', CN: 'China', DE: 'Germany', DZ: 'Algeria', EG: 'Egypt', ES: 'Spain', FR: 'France', GB: 'United Kingdom', GR: 'Greece', IN: 'India', IT: 'Italy', JP: 'Japan', KR: 'South Korea', MA: 'Morocco', MX: 'Mexico', NL: 'Netherlands', PL: 'Poland', PT: 'Portugal', RO: 'Romania', RU: 'Russia', SA: 'Saudi Arabia', TN: 'Tunisia', TR: 'Turkey', US: 'United States',
+};
+
+const CATEGORY_NAMES_EN: Record<string, string> = {
+  'Toutes': 'All', 'Autres': 'Other', 'Généralistes': 'General', 'Locales': 'Local', 'Nouveautés': 'New releases', 'International': 'International',
+  'Information': 'News', 'Sport': 'Sports', 'Cinéma': 'Cinema', 'Jeunesse': 'Kids', 'Documentaires': 'Documentaries', 'Musique': 'Music', 'Divertissement': 'Entertainment', 'Religion': 'Religion',
+  'Action': 'Action', 'Comédie': 'Comedy', 'Drame': 'Drama', 'Thriller': 'Thriller', 'Horreur': 'Horror', 'Science-fiction et fantastique': 'Science fiction & fantasy', 'Animation': 'Animation', 'Famille': 'Family', 'Romance': 'Romance', 'Policier': 'Crime', 'Historique': 'History', 'Séries': 'Series', 'Sans catégorie': 'Uncategorized',
+};
+
+const FRENCH_COUNTRY_TO_ENGLISH = new Map(Object.keys(COUNTRY_NAMES).map((code) => [COUNTRY_NAMES[code]!, COUNTRY_NAMES_EN[code] ?? COUNTRY_NAMES[code]!]));
+
+const LANGUAGE_NAMES: Record<string, [string, string]> = {
+  ar: ['Arabe', 'Arabic'], de: ['Allemand', 'German'], el: ['Grec', 'Greek'], en: ['Anglais', 'English'], es: ['Espagnol', 'Spanish'], fr: ['Français', 'French'], hi: ['Hindi', 'Hindi'], hy: ['Arménien', 'Armenian'], it: ['Italien', 'Italian'], ja: ['Japonais', 'Japanese'], ko: ['Coréen', 'Korean'], nl: ['Néerlandais', 'Dutch'], pl: ['Polonais', 'Polish'], pt: ['Portugais', 'Portuguese'], ro: ['Roumain', 'Romanian'], ru: ['Russe', 'Russian'], tr: ['Turc', 'Turkish'], zh: ['Chinois', 'Chinese'],
+};
+
+export function localizedCountryName(code: string, language: 'fr' | 'en') {
+  return (language === 'en' ? COUNTRY_NAMES_EN[code] : COUNTRY_NAMES[code]) ?? code;
+}
+
+export function localizedLanguageName(code: string, language: 'fr' | 'en') {
+  return LANGUAGE_NAMES[code]?.[language === 'fr' ? 0 : 1] ?? code.toUpperCase();
+}
+
+export function countryCodeFromCategoryLabel(label: string) {
+  const part = label.split(' · ').at(-1) ?? label;
+  const localized = Object.keys(COUNTRY_NAMES).find((code) => COUNTRY_NAMES[code] === part || COUNTRY_NAMES_EN[code] === part);
+  return localized ?? countryCodeInText(label);
+}
+
+export function applyCategoryLabelOverride(label: string, overrides: Record<string, string>) {
+  const separator = label.indexOf(' · ');
+  const theme = separator < 0 ? label : label.slice(0, separator);
+  const suffix = separator < 0 ? '' : label.slice(separator);
+  return `${overrides[theme] ?? theme}${suffix}`;
+}
+
+export function localizeCategoryDisplayName(label: string, language: 'fr' | 'en') {
+  if (language === 'fr') return label;
+  return label.split(' · ').map((part) => CATEGORY_NAMES_EN[part] ?? FRENCH_COUNTRY_TO_ENGLISH.get(part) ?? part).join(' · ');
+}
+
+export function localizePresentationName(label: string, language: 'fr' | 'en') {
+  if (language === 'fr') return label;
+  if (label === 'Chaîne sans nom') return 'Unnamed channel';
+  if (label === 'Titre sans nom') return 'Untitled';
+  return label.replace(/^Épisode\s+(\d+)$/i, 'Episode $1');
+}
+
 const COUNTRY_ALIASES: Record<string, string> = {
   ALGERIA: 'DZ', ALGERIE: 'DZ', ARM: 'AM', ARMENIA: 'AM', ARMENIE: 'AM', BRAZIL: 'BR', BRESIL: 'BR', CANADA: 'CA', CHINA: 'CN', CHINE: 'CN', EGYPT: 'EG', EGYPTE: 'EG', FRANCE: 'FR', GERMANY: 'DE', ALLEMAGNE: 'DE', GREECE: 'GR', GRECE: 'GR', INDIA: 'IN', INDE: 'IN', ITALY: 'IT', ITALIE: 'IT', JAPAN: 'JP', JAPON: 'JP', KOREA: 'KR', MAROC: 'MA', MEXICO: 'MX', MEXIQUE: 'MX', NETHERLANDS: 'NL', PAYS_BAS: 'NL', POLAND: 'PL', POLOGNE: 'PL', PORTUGAL: 'PT', ROMANIA: 'RO', ROUMANIE: 'RO', RUSSIA: 'RU', RUSSIE: 'RU', SPAIN: 'ES', ESPAGNE: 'ES', SWITZERLAND: 'CH', SUISSE: 'CH', TUNISIA: 'TN', TUNISIE: 'TN', TURKEY: 'TR', TURKIYE: 'TR', TURQUIE: 'TR', UK: 'GB', UNITED_KINGDOM: 'GB', ROYAUME_UNI: 'GB', USA: 'US', UNITED_STATES: 'US', ETATS_UNIS: 'US',
   AMERICAN: 'US', ARMENIAN: 'AM', BRITISH: 'GB', FRENCH: 'FR', TURKISH: 'TR',

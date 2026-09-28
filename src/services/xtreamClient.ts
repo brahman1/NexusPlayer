@@ -1,4 +1,5 @@
 import type { XtreamCredentials } from '../types/domain';
+import { translate } from '../i18n';
 
 export type XtreamLiveCategory = { category_id: string; category_name: string };
 export type XtreamVodCategory = XtreamLiveCategory;
@@ -49,14 +50,14 @@ async function apiRequest<T>(serverUrl: string, credentials: XtreamCredentials, 
   if (action) url.searchParams.set('action', action);
   for (const [key, value] of Object.entries(extra)) url.searchParams.set(key, value);
   const response = await fetch(url.toString(), { headers: { Accept: 'application/json' } });
-  if (!response.ok) throw new Error(`Le serveur Xtream a répondu avec le statut ${response.status}.`);
+  if (!response.ok) throw new Error(translate(`Le serveur Xtream a répondu avec le statut ${response.status}.`, `The Xtream server responded with status ${response.status}.`));
   return response.json() as Promise<T>;
 }
 
 export async function fetchXtreamCatalog(serverUrl: string, credentials: XtreamCredentials): Promise<XtreamCatalog> {
   const account = await apiRequest<{ user_info?: { auth?: number | string; status?: string }; server_info?: { url?: string } }>(serverUrl, credentials);
   if (Number(account.user_info?.auth) !== 1 || account.user_info?.status === 'Disabled' || account.user_info?.status === 'Banned') {
-    throw new Error('Connexion Xtream refusée. Vérifiez l’adresse et les identifiants.');
+    throw new Error(translate('Connexion Xtream refusée. Vérifiez l’adresse et les identifiants.', 'Xtream connection denied. Check the address and credentials.'));
   }
   const actions = ['get_live_categories', 'get_live_streams', 'get_vod_categories', 'get_vod_streams', 'get_series_categories', 'get_series'] as const;
   const [liveCategories, liveStreams, vodCategories, vodStreams, seriesCategories, series] = await Promise.all(actions.map((action) => apiRequest<unknown[]>(serverUrl, credentials, action)));
@@ -77,7 +78,7 @@ export async function fetchXtreamSeriesEpisodes(serverUrl: string, credentials: 
   for (const [seasonKey, episodes] of Object.entries(payload.episodes ?? {})) {
     for (const item of episodes ?? []) {
       if (item.id === undefined || item.id === null) continue;
-      result.push({ id: String(item.id), season: Number(seasonKey) || 0, episode: Number(item.episode_num) || 0, name: item.title?.trim() || `Épisode ${item.episode_num ?? ''}`.trim(), extension: item.container_extension || 'mp4', durationSeconds: Number(item.info?.duration_secs) || null });
+      result.push({ id: String(item.id), season: Number(seasonKey) || 0, episode: Number(item.episode_num) || 0, name: item.title?.trim() || translate(`Épisode ${item.episode_num ?? ''}`.trim(), `Episode ${item.episode_num ?? ''}`.trim()), extension: item.container_extension || 'mp4', durationSeconds: Number(item.info?.duration_secs) || null });
     }
   }
   return result;

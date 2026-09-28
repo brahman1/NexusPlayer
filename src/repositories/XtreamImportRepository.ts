@@ -1,4 +1,5 @@
 import { getDatabase } from '../storage/database';
+import { translate } from '../i18n';
 import { stableId } from '../utils/ids';
 import { deduplicateXtreamCatalog, type XtreamCatalog } from '../services/xtreamClient';
 import { categoryDisplayName, categorySortKey, channelDisplayName, inferChannelMetadata, mediaDisplayName, naturalSortKey } from '../services/channelPresentation';
@@ -7,7 +8,7 @@ export async function storeXtreamCatalog(playlistId: string, name: string, endpo
   const cleanCatalog = deduplicateXtreamCatalog(catalog);
   const database = await getDatabase();
   const duplicate = await database.getFirstAsync<{ name: string }>('SELECT name FROM playlists WHERE source_fingerprint = ?', sourceFingerprint);
-  if (duplicate) throw new Error(`Cette source existe déjà dans « ${duplicate.name} ».`);
+  if (duplicate) throw new Error(translate(`Cette source existe déjà dans « ${duplicate.name} ».`, `This source already exists in "${duplicate.name}".`));
   const category = await database.prepareAsync(`INSERT INTO categories (id, playlist_id, name, display_name, sort_name, kind, position) VALUES (?, ?, ?, ?, ?, ?, ?)`);
   const channel = await database.prepareAsync(`INSERT INTO channels (id, playlist_id, category_id, name, display_name, sort_name, stream_url, tvg_id, tvg_name, logo_url, language, country) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
   const movie = await database.prepareAsync(`INSERT INTO movies (id, playlist_id, category_id, name, display_name, sort_name, stream_url, poster_url, plot, release_year, external_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
