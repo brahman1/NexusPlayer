@@ -1,5 +1,21 @@
 # Reprise immédiate du développement
 
+## Branche comptes et abonnements — 29 septembre 2026
+
+- Le chantier commercial est isolé sur `feature/accounts-subscriptions`; `main`
+  reste la référence stable du lecteur, du catalogue mondial et de l'IHM Obsidian.
+- Réalisé : formules Gratuit, Premium, Family et Local à vie définies dans un
+  moteur de droits unique, avec limites d'appareils, lectures simultanées,
+  publicité, profils et synchronisation cloud.
+- Réalisé : écran bilingue Compte et abonnement, accessible depuis Réglages,
+  affichant le forfait courant, l'installation locale sans adresse MAC et les
+  appareils renvoyés par l'API lorsque le compte est connecté.
+- Réalisé : retrait confirmé d'un appareil, déconnexion conservant les données
+  locales et prise en charge correcte des réponses API sans contenu.
+- Prochaine étape : intégrer Supabase Auth seulement après fourniture des URL et
+  clés publiques, puis RevenueCat après création des produits App Store/Play Store.
+  Les secrets privés et la validation des droits restent exclusivement côté serveur.
+
 ## Chantier catalogue, reprise et comptes — 28 septembre 2026
 
 - Implémenté : noms d'affichage et clés de tri distincts des valeurs fournisseur

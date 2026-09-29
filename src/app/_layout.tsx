@@ -42,6 +42,7 @@ export default function RootLayout() {
               <Stack.Screen name="add-playlist" options={{ title: tx('Ajouter une source', 'Add a source') }} />
               <Stack.Screen name="playlist/[id]" options={{ title: tx('Chaînes', 'Channels') }} />
               <Stack.Screen name="player/[channelId]" options={{ title: tx('Lecture', 'Playback') }} />
+              <Stack.Screen name="account" options={{ title: tx('Compte et abonnement', 'Account & subscription') }} />
             </Stack>
           </AppBootstrap>
         </ThemeProvider>

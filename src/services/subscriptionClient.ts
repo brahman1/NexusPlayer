@@ -18,6 +18,7 @@ export class SubscriptionClient {
     });
     if (response.status === 401) throw new Error(translate('La session a expiré. Reconnectez-vous.', 'The session has expired. Sign in again.'));
     if (!response.ok) throw new Error(translate('Le service d’abonnement est momentanément indisponible.', 'The subscription service is temporarily unavailable.'));
+    if (response.status === 204) return undefined as T;
     return response.json() as Promise<T>;
   }
 

@@ -35,6 +35,7 @@ export function SettingsScreen() {
   };
   const syncLabel = syncInterval === 0 ? tx('Manuelle', 'Manual') : tx(`Toutes les ${syncInterval} h`, `Every ${syncInterval} hours`);
   const rows = [
+    [tx('Compte et abonnement', 'Account & subscription'), tx('Forfait et appareils', 'Plan and devices'), () => router.push('/account' as Href)],
     [tx('Langue', 'Language'), language === 'fr' ? 'Français' : 'English', toggleLanguage],
     [tx('Personnalisation du contenu', 'Content personalization'), contentPreferenceCount ? tx(`${contentPreferenceCount} choix`, `${contentPreferenceCount} selected`) : tx('Tout afficher', 'Show all'), () => router.push('/(tabs)/content-preferences' as Href)],
     [tx('Contraste renforcé', 'High contrast'), contrast ? tx('Activé', 'On') : tx('Désactivé', 'Off'), toggleContrast],
